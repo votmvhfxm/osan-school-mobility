@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>세교2 통학 설문 구글폼 양식</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm; }
+  body { font-family: "Malgun Gothic", sans-serif; color: #1d2330; font-size: 10.5pt; line-height: 1.55; }
+  h1 { font-size: 18pt; margin: 0 0 4px; }
+  h2 { font-size: 13pt; margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 2px solid #1d2330; }
+  h3 { font-size: 11pt; margin: 14px 0 6px; }
+  .sub { color: #667085; font-size: 9.5pt; }
+  .box { border: 1px solid #d0d5dd; border-radius: 8px; padding: 10px 12px; background: #f9fafb; margin: 8px 0; }
+  .copy { border: 1px dashed #98a2b3; border-radius: 8px; padding: 10px 12px; background: #fff; white-space: pre-wrap; margin: 6px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 9.5pt; margin: 6px 0; }
+  th, td { border: 1px solid #d0d5dd; padding: 5px 7px; vertical-align: top; text-align: left; }
+  th { background: #f2f4f7; }
+  .q { page-break-inside: avoid; border: 1px solid #e4e7ec; border-radius: 8px; padding: 8px 12px; margin: 8px 0; }
+  .q .t { font-weight: 700; }
+  .q .meta { font-size: 8.5pt; color: #475467; margin: 2px 0 4px; }
+  .req { color: #d92d20; }
+  .tag { display: inline-block; font-size: 8pt; padding: 0 6px; border-radius: 999px; background: #eef4ff; color: #3538cd; margin-right: 4px; }
+  ul { margin: 2px 0 2px 18px; padding: 0; }
+  .pb { page-break-before: always; }
+  .warn { border-left: 4px solid #d92d20; background: #fef3f2; padding: 8px 12px; margin: 8px 0; }
+  .ok { border-left: 4px solid #12b76a; background: #ecfdf3; padding: 8px 12px; margin: 8px 0; }
+</style>
+</head>
+<body>
+
+<h1>세교2지구 통학 설문 — 구글폼 제작 양식</h1>
+<div class="sub">한신대 AX 라이프케어 챌린지 · 지정공모 4번 "학생 안전통학 AI 지도" · 직접 수집 데이터(가점 항목)</div>
+
+<div class="box">
+<b>일정</b>: 10/15(수) 오전 배포 → 10/16(목) 저녁 리마인드 1회 → <b>10/17(금) 18:00 마감</b> → 응답 CSV를 <code>data/field/survey.csv</code>로 저장<br>
+<b>목표</b>: 응답 30건 이상 (PPT에 "직접 수집 n=○○"으로 표기)<br>
+<b>원칙</b>: 완전 익명. 이름·연락처·학번·상세 주소(동·호수)는 <b>받지 않는다</b>.
+</div>
+
+<h2>1. 폼 기본 설정</h2>
+<table>
+<tr><th style="width:28%">항목</th><th>설정</th></tr>
+<tr><td>이메일 수집</td><td><b>수집 안 함</b> (설정 → 응답 → 이메일 주소 수집: 사용 안 함)</td></tr>
+<tr><td>로그인 필요</td><td><b>해제</b> (응답 횟수 1회로 제한하면 로그인이 강제되므로 끈다)</td></tr>
+<tr><td>응답 수정</td><td>허용 안 함</td></tr>
+<tr><td>진행률 표시줄</td><td>켜기</td></tr>
+<tr><td>확인 메시지</td><td>"참여해 주셔서 감사합니다. 결과는 통학 위험 구간 개선 제안에 통계로만 사용됩니다."</td></tr>
+<tr><td>섹션 구성</td><td>섹션 1 안내·동의 / 섹션 2 기본 정보 / 섹션 3 등교 실태 / 섹션 4 위험 지점 / 섹션 5 의견</td></tr>
+</table>
+
+<h2>2. 제목과 설명 (그대로 복사)</h2>
+<h3>제목</h3>
+<div class="copy">세교2지구 중학교 통학길 설문 (1분 · 익명)</div>
+<h3>설명</h3>
+<div class="copy">안녕하세요, 한신대학교 학생팀입니다.
+세교2지구 아이들이 어느 중학교에 배정되느냐에 따라 통학 거리와 위험 구간이 크게 달라집니다.
+저희는 공공데이터와 AI로 단지별 통학 부담과 위험 구간을 분석하고 있으며, 실제로 느끼시는 통학 실태를 함께 반영하려고 합니다.
+
+· 소요 시간: 약 1~2분 (12문항, 대부분 선택형)
+· 완전 익명: 이름·연락처·이메일을 받지 않습니다.
+· 사용 목적: 한신대 AI·SW 페스티벌 공모전 분석 및 "통학 부담이 큰 구간부터 개선" 제안 자료 (통계로만 사용)
+· 기간: 10월 17일(금) 18시까지
+· 문의: (팀 대표 메일 주소 입력)
+
+학생 본인 또는 보호자 모두 참여하실 수 있습니다. 감사합니다!</div>
+
+<h2>3. 문항 (섹션별)</h2>
+<div class="sub"><span class="req">*</span> = 필수 응답 · 괄호 안 영문은 CSV 열 이름(응답 시트를 내려받은 뒤 이 이름으로 맞춤)</div>
+
+<h3>섹션 1. 안내 및 동의</h3>
+<div class="q"><div class="t">Q0. 위 안내를 확인했으며, 익명 응답이 통계 목적으로 사용되는 데 동의합니다. <span class="req">*</span></div>
+<div class="meta"><span class="tag">객관식</span> (consent) — "아니요"를 선택하면 <b>양식 제출</b>로 이동하도록 설정</div>
+<ul><li>예, 동의합니다</li><li>아니요</li></ul></div>
+
+<h3>섹션 2. 기본 정보</h3>
+<div class="q"><div class="t">Q1. 응답하시는 분은 누구인가요? <span class="req">*</span></div>
+<div class="meta"><span class="tag">객관식</span> (respondent)</div>
+<ul><li>학생 본인</li><li>보호자</li></ul></div>
+
+<div class="q"><div class="t">Q2. 거주하시는 단지를 선택해 주세요. <span class="req">*</span></div>
+<div class="meta"><span class="tag">드롭다운</span> (complex) — 분석 대상 단지 + 주변 단지 + 기타</div>
+<ul>
+<li>호반써밋 라센트 (A-1)</li><li>호반써밋 라포레 (A-2)</li><li>오산세교2 중흥S-클래스 에듀파크 (A-4)</li>
+<li>우미린 포레아시티 (A-5)</li><li>중흥S-클래스 에듀하이 (A-9)</li><li>세교2 칸타빌 더퍼스트 (A-10)</li>
+<li>오산 세교 아테라 (A-12)</li><li>호반써밋 라프리미어 (A-13)</li><li>오산세교 우미린 센트럴시티 (A-14)</li>
+<li>오산세교2 LH 21단지 (A-15)</li><li>오산세교 한신더휴 (A-16)</li><li>오산세교 힐데스하임 (A-20)</li>
+<li>오산대역 세교 모아미래도 (A-21)</li><li>오산 SK뷰 2차</li><li>오산세교2 LH 12단지</li>
+<li>기타 세교2지구 단지</li><li>세교2지구 밖</li>
+</ul></div>
+
+<div class="q"><div class="t">Q3. 학생의 현재 학년은? <span class="req">*</span></div>
+<div class="meta"><span class="tag">객관식</span> (grade)</div>
+<ul><li>초등 5학년 이하</li><li>초등 6학년 (중학교 배정 예정)</li><li>중1</li><li>중2</li><li>중3</li></ul></div>
+
+<div class="q"><div class="t">Q4. 다니는(또는 배정받은) 중학교는? <span class="req">*</span></div>
+<div class="meta"><span class="tag">객관식</span> (school) — 초등학생이면 "아직 배정 전"</div>
+<ul><li>대호중</li><li>오산중</li><li>가수중</li><li>그 외 중학교</li><li>아직 배정 전 (초등학생)</li></ul></div>
+
+<h3>섹션 3. 등교 실태 <span class="sub">(초등학생이면 현재 초등학교 등교 기준으로 응답)</span></h3>
+<div class="q"><div class="t">Q5. 평소 등교할 때 주로 이용하는 방법은? <span class="req">*</span></div>
+<div class="meta"><span class="tag">객관식</span> (mode_am)</div>
+<ul><li>걸어서</li><li>버스</li><li>자가용(보호자 차량)</li><li>자전거·전동킥보드</li><li>걷기 + 버스 혼합</li><li>학원·통학 차량</li></ul></div>
+
+<div class="q"><div class="t">Q6. 집에서 교문까지 실제로 걸리는 시간은 약 몇 분인가요? <span class="req">*</span></div>
+<div class="meta"><span class="tag">단답형</span> (time_min_self) — 응답 확인 → 숫자 → 1 이상 120 이하</div>
+<ul><li>예: 25</li></ul></div>
+
+<div class="q"><div class="t">Q7. (버스 이용 시) 등교 시간대 정류장에서 평균 몇 분 기다리나요?</div>
+<div class="meta"><span class="tag">단답형</span> (bus_wait_min_self) — 선택 응답, 숫자</div>
+<ul><li>버스를 이용하지 않으면 비워 두세요</li></ul></div>
+
+<div class="q"><div class="t">Q8. 등교 시간에 버스가 꽉 차서 못 탄 적이 있나요?</div>
+<div class="meta"><span class="tag">객관식</span> (bus_full)</div>
+<ul><li>자주 있다 (주 1회 이상)</li><li>가끔 있다</li><li>없다</li><li>버스를 이용하지 않는다</li></ul></div>
+
+<h3>섹션 4. 위험 지점</h3>
+<div class="q"><div class="t">Q9. 통학길에서 위험하다고 느끼는 곳을 모두 골라 주세요. <span class="req">*</span></div>
+<div class="meta"><span class="tag">체크박스</span> (danger_spots) — 보기는 AI 분석에서 위험도가 높게 나온 도로 + 학교 앞. <b>응답으로 모델을 검증</b>하는 핵심 문항</div>
+<ul>
+<li>감투로 (가수동·누읍동 구간)</li><li>초평중앙로 (탑동, LH 21단지·한신더휴 주변)</li><li>발안로 횡단 구간</li>
+<li>고을로 · 가수1로 교차로 부근</li><li>죽담로 (궐동, 라센트·라포레·모아미래도 주변)</li><li>수목원로</li>
+<li>오산대역 주변</li><li>대호중 정문 앞 (궐리사로)</li><li>오산중 정문 앞 (청학로)</li><li>가수중 정문 앞</li>
+<li>공사 중인 단지·도로 주변</li><li>위험하다고 느끼는 곳 없음</li>
+</ul></div>
+
+<div class="q"><div class="t">Q10. 위 목록에 없는 위험한 곳이 있다면 적어 주세요.</div>
+<div class="meta"><span class="tag">단답형</span> (danger_other) — 선택 응답</div>
+<ul><li>예: "○○아파트 후문 앞 신호 없는 횡단보도", "△△마트 앞 불법주차로 보도 막힘"</li></ul></div>
+
+<div class="q"><div class="t">Q11. 위험해서 일부러 더 먼 길로 돌아가는 경우가 있나요? <span class="req">*</span></div>
+<div class="meta"><span class="tag">객관식</span> (detour_yes) — 안전 경로 기능의 필요성 근거</div>
+<ul><li>예, 자주</li><li>가끔</li><li>아니요</li></ul></div>
+
+<h3>섹션 5. 의견</h3>
+<div class="q"><div class="t">Q12. 통학과 관련해 바라는 점이 있다면 자유롭게 적어 주세요.</div>
+<div class="meta"><span class="tag">장문형</span> (comment) — 선택 응답</div>
+<ul><li>예: 등교 시간 버스 증차, 횡단보도 신호 설치, 세교2-1 학교 조기 개교 등</li></ul></div>
+
+<h2 class="pb">4. 수집할 정보 정리 (분석에 쓰는 방법)</h2>
+<table>
+<tr><th style="width:18%">CSV 열</th><th style="width:22%">문항</th><th>분석에서 쓰는 방법 → PPT 결과물</th></tr>
+<tr><td>respondent</td><td>Q1 응답자</td><td>표본 구성 표기 ("보호자 ○%·학생 ○%")</td></tr>
+<tr><td>complex</td><td>Q2 단지</td><td>단지별로 묶어 모델 지수와 대조. 북측과 남측 비교</td></tr>
+<tr><td>grade / school</td><td>Q3·Q4</td><td>배정 학교별 실제 통학 시간 분포 → "같은 단지, 다른 학교" 사례</td></tr>
+<tr><td>mode_am</td><td>Q5 등교 수단</td><td>도보·버스 비율 → 지도 화면의 도보/버스 토글이 필요한 근거</td></tr>
+<tr><td>time_min_self</td><td>Q6 실제 시간</td><td><b>모델 소요시간과 비교</b> (오차·상관) → "계산값과 체감값 차이 ○분"</td></tr>
+<tr><td>bus_wait_min_self, bus_full</td><td>Q7·Q8</td><td>GBIS 배차 기반 대기 근사치 보정, 버스 공백 표의 근거</td></tr>
+<tr><td>danger_spots</td><td>Q9 위험 지점</td><td><b>모델 위험 구간 적중률</b> = 모델 상위 구간 중 응답자가 꼽은 비율</td></tr>
+<tr><td>danger_other</td><td>Q10</td><td>모델이 놓친 지점 → 네이버 Maps Geocoding(추가 구현 필요)으로 좌표화해 지도에 "주민 제보" 레이어로 추가</td></tr>
+<tr><td>detour_yes</td><td>Q11 우회 여부</td><td>"응답자 ○%가 위험 때문에 돌아간다" → 안전 경로 기능 필요성</td></tr>
+<tr><td>comment</td><td>Q12</td><td>정성 인용 2~3개(개인정보 제거 후)</td></tr>
+</table>
+
+<div class="warn"><b>받지 않는 정보</b>: 이름, 전화번호, 이메일, 학번·반, 동·호수, 얼굴이 나온 사진. 미성년자가 포함된 조사이므로 개인을 식별할 수 있는 정보를 받으면 보호자 동의 절차가 필요해진다. 그래서 처음부터 받지 않는다.</div>
+<div class="ok"><b>응답 정리</b>: 구글폼 → 응답 → 스프레드시트 연결 → 파일 → 다운로드 → CSV. 열 이름을 위 표의 영문 이름으로 바꿔 <code>data/field/survey.csv</code>로 저장. 열 이름 변경은 개발 담당이 해도 된다.</div>
+
+<h2>5. 카카오톡 오픈채팅방 메시지</h2>
+<div class="sub">올리기 전에 <b>방장에게 1:1로 양해</b>를 구한다(홍보 금지 방이 많음). 방마다 한 번만 올리고, 마감 전날 리마인드는 한 번만 한다.</div>
+
+<h3>① 방장 양해 메시지 (1:1)</h3>
+<div class="copy">안녕하세요, 방장님! 한신대학교 학생입니다.
+세교2지구 중학생 통학길(배정 학교별 거리·위험 구간)을 공공데이터로 분석하는 공모전을 준비하고 있습니다.
+익명 1분 설문 링크를 방에 한 번 올려도 될까요? 광고나 홍보 목적은 전혀 없고, 이름·연락처도 받지 않습니다.
+허락해 주시면 감사하겠습니다 🙏</div>
+
+<h3>② 본 게시 메시지</h3>
+<div class="copy">안녕하세요, 세교2 이웃 여러분 😊 한신대학교 학생팀입니다.
+
+세교2지구는 남북으로 길어서, 같은 단지에 살아도 <b>어느 중학교에 배정되느냐에 따라 통학 거리가 2~3배</b>까지 차이 납니다.
+저희는 공공데이터와 AI로 단지별 통학 부담과 위험 구간을 분석해 "부담이 큰 구간부터 개선하자"는 제안을 만들고 있어요.
+
+실제로 느끼시는 통학길 이야기를 듣고 싶습니다.
+📋 익명 1분 설문 (이름·연락처 안 받아요)
+👉 [구글폼 링크]
+⏰ 10월 17일(금) 18시까지
+
+학생 본인도, 보호자도 참여하실 수 있어요.
+주변 세교2 이웃분들께 공유해 주시면 큰 힘이 됩니다. 감사합니다! 🙏</div>
+
+<h3>③ 리마인드 (10/16 저녁, 한 번만)</h3>
+<div class="copy">어제 설문 참여해 주신 분들 정말 감사합니다 🙏
+세교2 중학교 통학길 익명 1분 설문, <b>내일(17일) 18시에 마감</b>합니다.
+아직 참여 안 하셨다면 잠깐만 시간 내 주세요!
+👉 [구글폼 링크]</div>
+
+<h3>④ 감사·결과 공유 (선택, 마감 후)</h3>
+<div class="copy">설문에 참여해 주신 ○○분 감사합니다!
+응답해 주신 내용을 바탕으로 단지별 통학 위험 구간을 정리했어요. 공모전이 끝나면 요약 결과를 이 방에 공유드리겠습니다 😊</div>
+
+<div class="sub" style="margin-top:14px">※ 카톡 메시지에 쓴 "2~3배"는 직선거리 간이 계산과 보행 경로 분석(1차) 결과에 근거한 표현이다. 숫자가 바뀌면 메시지도 함께 고친다.</div>
+
+</body>
+</html>

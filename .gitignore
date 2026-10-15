@@ -1,0 +1,6 @@
+.env
+web/config.js
+backups/
+__pycache__/
+*.pyc
+cache/

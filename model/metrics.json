@@ -1,0 +1,19 @@
+{
+  "n_edges": 10806,
+  "n_pos": 0,
+  "features": [
+    "hw_rank",
+    "ped_only",
+    "major_road",
+    "lanes_n",
+    "length_m",
+    "n_intersections",
+    "n_crossings",
+    "n_unsignal_crossings",
+    "signal_ratio",
+    "in_school_zone"
+  ],
+  "mode": "rule",
+  "note": "사고다발지역 양성 간선이 0개로 30개 미만이라 학습 모델 대신 규칙 기반 점수식을 사용함.",
+  "risk_ge_0.6_share": 0.148
+}
