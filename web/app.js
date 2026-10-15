@@ -1,7 +1,7 @@
 "use strict";
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let data, segments = [], segmentError = false, map, layers = [];
+let data, segments = [], segmentError = false, map, layers = [], fullDataPromise;
 const state = {page:"recommend", category:"walk", complex:null, school:null, mode:"walk", schoolLevel:"all", segment:0, complexQuery:""};
 const copy = {recommend:["개선 위치 추천","통학 부담이 큰 곳부터, 개선이 필요한 위치를 살펴보세요."],commute:["우리 집 통학길","우리 단지에서 학교까지, 시간과 위험 구간을 함께 비교하세요."]};
 function csv(text) {
@@ -136,7 +136,7 @@ async function initMap(){
   try{
     await new Promise((resolve,reject)=>{
       const fail=message=>{failed=true;clearTimeout(timer);mapFallback(message);reject(new Error(message));};
-      const timer=setTimeout(()=>fail("네이버 지도 연결 시간 초과 · 좌표 기반 개요를 표시합니다."),12000);
+      const timer=setTimeout(()=>fail("네이버 지도 연결 시간 초과 · 좌표 기반 개요를 표시합니다."),2000);
       window.navermap_authFailure=()=>fail("네이버 지도 인증 실패 · Client ID·등록 URL·이용 한도를 확인해 주세요.");
       const script=document.createElement("script");
       script.src=`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(key)}`;
@@ -155,7 +155,7 @@ async function initMap(){
 }
 (async()=>{
   try{
-    const r=await fetch("../data/index.json?v=20261016",{cache:"no-store"});if(!r.ok)throw new Error("통학 데이터 응답 오류");data=await r.json();if(!data.complexes?.length||!data.schools?.length)throw new Error("통학 데이터가 비어 있습니다");
+    const r=await fetch("../data/index-lite.json?v=20261016-1");if(!r.ok)throw new Error("통학 데이터 응답 오류");data=await r.json();if(!data.complexes?.length||!data.schools?.length)throw new Error("통학 데이터가 비어 있습니다");
     try{const sr=await fetch("../data/priority_segments.csv?v=20261016",{cache:"no-store"});if(!sr.ok)throw new Error();segments=csv(await sr.text());}catch{segmentError=true;}
     state.complex=data.complexes[0].id;state.school=data.schools[0].school_id;
     $("coverage").textContent=`${data.complexes.length}개 단지 · ${data.schools.length}개 학교`;
@@ -164,5 +164,6 @@ async function initMap(){
     $("dataStatus").textContent=`${data.meta.risk_model==="rule"?"규칙 기반 위험도":"계산된 위험도"} · ${data.meta.bus_available?"버스 경로 연결":data.meta.bus_stop_count?`정류장 ${data.meta.bus_stop_count}곳 수집`:"버스 데이터 수집 전"}`;
     if(window.SURVEY_ENABLED===true&&surveyUrl()){$("surveyButton").setAttribute("aria-label","현장 의견조사 · 구글폼 새 창");$("surveyButton").title="현장 의견조사 · 구글폼 새 창";$("surveyButton").querySelector(".pending-dot").hidden=true;}
     navigate(location.hash.slice(1)||"commute");await initMap();
+    fullDataPromise=fetch("../data/index.json?v=20261016-1").then(response=>{if(!response.ok)throw new Error("상세 통학 데이터 응답 오류");return response.json();}).then(full=>{data=full;if(state.page==="commute")render();return full;}).catch(error=>{console.warn("상세 통학 경로 지연 로드 실패",error);return null;});
   }catch(e){$("panel").innerHTML=`<h2>데이터를 불러오지 못했어요</h2><p>${esc(e.message)}</p><p class="small">서버 실행 상태와 data/index.json을 확인한 뒤 새로고침해 주세요.</p>`;$("mapStatus").textContent="통학 데이터 연결 필요";$("dataStatus").textContent="데이터 연결 오류";}
 })();

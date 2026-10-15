@@ -4,7 +4,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parent
-PUBLIC_DATA = {"index.json", "priority.csv", "priority_segments.csv", "priority_bus.csv"}
+PUBLIC_DATA = {"index.json", "index-lite.json", "priority.csv", "priority_segments.csv", "priority_bus.csv"}
 PUBLIC_WEB = {"index.html", "app.js", "app.css", "config.js"}
 
 
