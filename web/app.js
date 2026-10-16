@@ -45,11 +45,11 @@ function render(){
     }else if(state.category==="bus"){
       const items=data.meta.bus_recommendations||[];
       html+=`<div class="notice">노선·배차 원본 없이 정류장 좌표와 직선거리 기반으로 계산한 <strong>배치 검토용 추정</strong>입니다. 실제 노선 신설·이전 결정 전 현장 확인이 필요합니다.</div>`;
-      html+=items.length?items.map((x,i)=>`<div class="candidate"><div class="row"><strong>${i+1}. ${esc(x.stop)}</strong></div><div class="small">${esc(x.complex)} · ${esc(x.reason)}</div></div>`).join(""):'<div class="empty"><h3>정류장 좌표가 없습니다</h3><p>정류장 데이터를 먼저 수집해야 합니다.</p></div>';
+      html+=items.length?items.map((x,i)=>`<button class="candidate ${i===state.segment?"selected":""}" data-segment="${i}" aria-pressed="${i===state.segment}"><div class="row"><strong>${i+1}. ${esc(x.stop)}</strong></div><div class="small">${esc(x.complex)} · ${esc(x.reason)}</div></button>`).join(""):'<div class="empty"><h3>정류장 좌표가 없습니다</h3><p>정류장 데이터를 먼저 수집해야 합니다.</p></div>';
     }else{
       const items=data.meta.school_recommendations||[];
       html+=`<div class="notice">새 학교의 확정 위치가 아니라, 현재 단지·학교 통학 부담을 바탕으로 산출한 <strong>학교 후보 검토 권역</strong>입니다. 부지·학생 수요·수용 여력 확인이 필요합니다.</div>`;
-      html+=items.length?items.map((x,i)=>`<div class="candidate"><div class="row"><strong>${i+1}. ${esc(x.area)} 권역</strong><span class="rank">부담 ${fmt(x.mean_index)}</span></div><div class="small">${esc(x.reason)}</div></div>`).join(""):'<div class="empty"><h3>학교 분석 데이터가 없습니다</h3><p>통학 계산 결과를 먼저 생성해야 합니다.</p></div>';
+      html+=items.length?items.map((x,i)=>`<button class="candidate ${i===state.segment?"selected":""}" data-segment="${i}" aria-pressed="${i===state.segment}"><div class="row"><strong>${i+1}. ${esc(x.area)} 권역</strong><span class="rank">부담 ${fmt(x.mean_index)}</span></div><div class="small">${esc(x.reason)}</div></button>`).join(""):'<div class="empty"><h3>학교 분석 데이터가 없습니다</h3><p>통학 계산 결과를 먼저 생성해야 합니다.</p></div>';
     }
   }else{
     html=`<h2 class="panel-title">우리 단지에서 학교까지</h2><p class="panel-lead">출발 단지를 바꾸면 학교별 통학 부담과 안전 경로가 즉시 업데이트됩니다.</p>${selectors()}${tabs([["all","전체 학교"],["초등학교","초등학교"],["중학교","중학교"]],state.schoolLevel,"data-level")}${tabs([["walk","도보"],["bus","버스"]],state.mode,"data-mode")}`;
@@ -65,7 +65,7 @@ function render(){
   $("panel").innerHTML=html;bindPanel();drawMap();
 }
 function bindPanel(){
-  for(const [attr,key] of [["category","category"],["mode","mode"],["school","school"],["level","schoolLevel"],["segment","segment"]])document.querySelectorAll(`[data-${attr}]`).forEach(b=>b.onclick=()=>{state[key]=key==="segment"?Number(b.dataset[attr]):b.dataset[attr];if(key==="schoolLevel"){const first=visibleSchools()[0];state.school=first?.school_id||null;}render();});
+  for(const [attr,key] of [["category","category"],["mode","mode"],["school","school"],["level","schoolLevel"],["segment","segment"]])document.querySelectorAll(`[data-${attr}]`).forEach(b=>b.onclick=()=>{state[key]=key==="segment"?Number(b.dataset[attr]):b.dataset[attr];if(key==="category")state.segment=0;if(key==="schoolLevel"){const first=visibleSchools()[0];state.school=first?.school_id||null;}render();});
   if($("complexList"))$("complexList").onclick=e=>{
     const button=e.target.closest("[data-complex-option]");
     if(!button)return;
@@ -109,7 +109,7 @@ function drawMap(){
   const {paths,points}=scene();$("mapTitle").textContent=state.page==="recommend"?"통학 부담과 개선 검토 지점":"우리 단지의 통학 경로";
   if(map){
     layers.forEach(l=>l.setMap(null));layers=[];const bounds=new naver.maps.LatLngBounds(points[0] ? new naver.maps.LatLng(points[0].lat,points[0].lon) : map.getCenter(), points[0] ? new naver.maps.LatLng(points[0].lat,points[0].lon) : map.getCenter());
-    for(const p of points){const el=document.createElement("button");el.className="map-pin"+(p.type==="school"?" school":"")+(p.type==="candidate"?" candidate-pin":"");el.textContent=p.displayLabel|| (p.type==="complex"?p.label.replace(/^오산세교2 /,""):p.label);el.style.background=p.color;if(state.page==="recommend"&&p.type==="candidate")el.style.opacity=".55";el.onclick=()=>selectPoint(p);const pos=new naver.maps.LatLng(p.lat,p.lon);bounds.extend(pos);const o=new naver.maps.Marker({position:pos,icon:{content:el,anchor:new naver.maps.Point(0,0)},zIndex:p.type==="candidate"?5:2});o.setMap(map);layers.push(o);}
+    for(const p of points){const el=document.createElement("button");el.className="map-pin"+(p.type==="school"?" school":"")+(p.type==="candidate"?` candidate-pin ${state.category}-pin`:"");el.textContent=p.displayLabel|| (p.type==="complex"?p.label.replace(/^오산세교2 /,""):p.label);el.style.background=p.color;if(state.page==="recommend"&&p.type==="candidate")el.style.opacity=p.id===state.segment?"1":".4";el.onclick=()=>selectPoint(p);const pos=new naver.maps.LatLng(p.lat,p.lon);bounds.extend(pos);const o=new naver.maps.Marker({position:pos,icon:{content:el,anchor:new naver.maps.Point(0,0)},zIndex:p.type==="candidate"?(p.id===state.segment?8:5):2});o.setMap(map);layers.push(o);}
     for(const p of paths){const path=p.coords.map(([a,b])=>new naver.maps.LatLng(a,b));path.forEach(pos=>bounds.extend(pos));const l=new naver.maps.Polyline({map,path,strokeColor:p.color,strokeWeight:5,strokeStyle:p.dash?"shortdash":"solid",strokeOpacity:.9});layers.push(l);}
     map.fitBounds(bounds,{top:80,right:60,bottom:60,left:60});return;
   }
@@ -119,7 +119,7 @@ function drawMap(){
   const xy=(lat,lon)=>[width/2+(lon-(lon0+lon1)/2)*cos*scale,(height-40)/2-(lat-(lat0+lat1)/2)*scale];
   let html='<text x="30" y="35" fill="#789184" font-size="12">N ↑</text>';
   html+=paths.map(p=>`<polyline points="${p.coords.map(([a,b])=>xy(a,b).join(",")).join(" ")}" fill="none" stroke="${p.color}" stroke-width="4" ${p.dash?'stroke-dasharray="7 6"':""} opacity=".85"/>`).join("");
-  html+=points.map((p,i)=>{const [x,y]=xy(p.lat,p.lon),candidate=p.type==="candidate",selected=candidate&&p.id===state.segment;const showLabel=p.type==="school"||(p.type==="complex"&&p.id===state.complex);const opacity=state.page==="recommend"&&candidate?".55":"1";return `<g data-point="${i}" tabindex="0" role="button" aria-label="${esc(p.label)}" style="cursor:pointer;opacity:${opacity}"><title>${esc(p.label)}</title>${selected?`<circle cx="${x}" cy="${y}" r="21" fill="#cc625522"/>`:""}<circle cx="${x}" cy="${y}" r="${candidate?13:7}" fill="${p.color}" stroke="white" stroke-width="2"/>${candidate?`<text x="${x}" y="${y+4}" text-anchor="middle" fill="white" font-size="10" font-weight="700">${p.id+1}</text>`:showLabel?`<text x="${x>width*.6?x-12:x+12}" y="${y+4}" text-anchor="${x>width*.6?"end":"start"}" fill="#243f4a" font-size="11" paint-order="stroke" stroke="#edf2ed" stroke-width="3">${esc(p.label.replace(/^오산세교2 /,""))}</text>`:""}</g>`;}).join("");
+  html+=points.map((p,i)=>{const [x,y]=xy(p.lat,p.lon),candidate=p.type==="candidate",selected=candidate&&p.id===state.segment;const showLabel=p.type==="school"||(p.type==="complex"&&p.id===state.complex);const opacity=state.page==="recommend"&&candidate?(selected?"1":".4"):"1";const radius=candidate?(state.category==="walk"?13:17):7;return `<g data-point="${i}" tabindex="0" role="button" aria-label="${esc(p.label)}" style="cursor:pointer;opacity:${opacity}"><title>${esc(p.label)}</title>${selected?`<circle cx="${x}" cy="${y}" r="${radius+7}" fill="#bc453b22"/>`:""}<circle cx="${x}" cy="${y}" r="${radius}" fill="${p.color}" stroke="white" stroke-width="2"/>${candidate?`<text x="${x}" y="${y+4}" text-anchor="middle" fill="white" font-size="10" font-weight="700">${p.id+1}</text>`:showLabel?`<text x="${x>width*.6?x-12:x+12}" y="${y+4}" text-anchor="${x>width*.6?"end":"start"}" fill="#243f4a" font-size="11" paint-order="stroke" stroke="#edf2ed" stroke-width="3">${esc(p.label.replace(/^오산세교2 /,""))}</text>`:""}</g>`;}).join("");
   $("overview").innerHTML=html;$("overview").querySelectorAll("[data-point]").forEach(g=>{const activate=()=>selectPoint(points[Number(g.dataset.point)]);g.onclick=activate;g.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();activate();}};});
 }
 function navigate(page){if(!copy[page])page="commute";state.page=page;history.replaceState(null,"",`#${page}`);render();}
