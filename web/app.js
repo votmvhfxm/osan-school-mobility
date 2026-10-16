@@ -147,7 +147,8 @@ function drawMap(){
 }
 function navigate(page){if(!copy[page])page="commute";state.page=page;history.replaceState(null,"",`#${page}`);render();}
 function surveyUrl(){try{const u=new URL(window.SURVEY_FORM_URL);return u.protocol==="https:"&&(u.hostname==="forms.gle"||(u.hostname==="docs.google.com"&&u.pathname.startsWith("/forms/")))?u.href:null;}catch{return null;}}
-$("surveyButton").onclick=()=>{const url=surveyUrl();if(window.SURVEY_ENABLED===true&&url)window.open(url,"_blank","noopener,noreferrer");else $("surveyDialog").showModal();};
+$("surveyButton").onclick=()=>$("surveyDialog").showModal();
+$("surveyLink").onclick=()=>{const url=surveyUrl();if(window.SURVEY_ENABLED===true&&url)window.open(url,"_blank","noopener,noreferrer");};
 $("methodButton").onclick=()=>$("methodDialog").showModal();
 document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>navigate(b.dataset.page));
 window.addEventListener("hashchange",()=>navigate(location.hash.slice(1)));
