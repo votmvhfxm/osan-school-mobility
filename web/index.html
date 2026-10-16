@@ -29,7 +29,7 @@
   <button data-page="commute" aria-label="우리 집 통학길" title="우리 집 통학길"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8"/></svg><span class="tooltip">우리 집 통학길</span></button>
   <button id="surveyButton" aria-label="현장 의견조사 · 설문 조사" title="현장 의견조사 · 설문 조사"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H5v17h14V4h-3M8 2h8v5H8zM8 12h8M8 16h5"/></svg><span class="tooltip">현장 의견조사</span><span class="pending-dot"></span></button>
 </nav>
-<dialog id="surveyDialog"><div class="dialog-inner"><span class="pill">설문 조사</span><h2>주민 실태조사에 참여해주세요</h2><p>더 나은 환경 개선을 위해 주민 실태조사를 진행 중입니다.<br>아래 버튼을 누르시면 실태조사 구글폼으로 연결됩니다.</p><form method="dialog"><button id="surveyLink" class="primary" type="submit">구글폼 열기 ↗</button></form></div></dialog>
+<dialog id="surveyDialog"><div class="dialog-inner"><span class="pill">설문 조사</span><h2>주민 실태조사에 참여해주세요</h2><p>더 나은 환경 개선을 위해 주민 실태조사를 진행 중입니다.<br>아래 버튼을 누르시면 실태조사 구글폼으로 연결됩니다.</p><form method="dialog" class="dialog-actions"><button id="surveyLink" class="primary" type="submit">구글폼 열기 ↗</button><button class="secondary" type="submit">닫기</button></form></div></dialog>
 <dialog id="methodDialog"><div class="dialog-inner"><span class="pill">분석 방법</span><h2>통학 부담 지수는 이렇게 계산해요</h2><p>도보 경로의 시간과 위험 구간을 함께 보고, 위험한 최단 경로 대신 제한된 우회 경로를 추천합니다.</p><div class="method-grid"><span><b>01</b> 보행망 구축</span><span><b>02</b> 위험도 산정</span><span><b>03</b> 안전 경로 비교</span><span><b>04</b> 개선 우선순위</span></div><form method="dialog"><button class="primary">확인</button></form></div></dialog>
 <script src="config.js?v=20261016-1"></script><script src="app.js?v=20261016-10"></script>
 </body></html>
