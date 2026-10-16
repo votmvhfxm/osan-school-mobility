@@ -14,7 +14,7 @@ function csv(text) {
 const currentComplex=()=>data.complexes.find(c=>c.id===state.complex);
 const result=()=>currentComplex()?.results[state.school];
 const fmt=n=>Number.isFinite(Number(n))?Number(n).toFixed(1):"—";
-const options=(items,value)=>items.map(([id,name])=>`<option value="${esc(id)}" ${id===value?"selected":""}>${esc(name)}</option>`).join("");
+const options=(items,value)=>`<option value="" ${value?"":"selected"} disabled>학교를 선택하세요</option>`+items.map(([id,name])=>`<option value="${esc(id)}" ${id===value?"selected":""}>${esc(name)}</option>`).join("");
 const visibleSchools=()=>data.schools.filter(s=>state.schoolLevel==="all"||s.school_level===state.schoolLevel);
 const sortKorean=(a,b)=>String(a).localeCompare(String(b),"ko");
 const sortedComplexes=()=>[...data.complexes].sort((a,b)=>sortKorean(a.name,b.name));
@@ -22,6 +22,18 @@ const compact=(value)=>String(value??"").toLocaleLowerCase("ko-KR").replace(/\s+
 const complexMatches=(query)=>{
   const matches=sortedComplexes().filter(c=>!query||compact(c.name).includes(compact(query)));
   return query?matches.slice(0,8):matches;
+};
+const walkingReason=s=>{
+  const paths=Number(s["통과경로수"]||0),risk=Number(s["위험도"]||0),length=Number(s["길이_m"]||0);
+  if(paths>=200&&risk>=.6)return `많은 통학 경로(${paths}개)가 지나고 위험도 ${risk.toFixed(2)}가 높은 구간이라, 우선적인 보행환경 개선이 필요합니다.`;
+  if(risk>=.6)return `위험도 ${risk.toFixed(2)}가 높은 구간으로, 학생들이 안심하고 지날 수 있도록 보행환경 개선이 필요합니다.`;
+  if(paths>=100)return `많은 통학 경로(${paths}개)가 지나는 구간이라, 개선하면 여러 학생의 통학 안전을 함께 높일 수 있습니다.`;
+  return `${length}m 구간의 통학 안전을 높이고 학생들이 더 안심하고 지날 수 있도록 보행환경 개선을 검토합니다.`;
+};
+const relatedComplexSummary=s=>{
+  const names=String(s["관련단지"]||"").split(",").map(v=>v.trim()).filter(Boolean),count=Number(s["관련단지수"]||names.length);
+  if(!count)return "관련 단지 보행환경 개선";
+  return `${names[0]||"관련 단지"} 외 ${Math.max(0,count-1)}건 단지 보행환경 개선`;
 };
 function selectors(school=false){
   const selected=currentComplex();
@@ -40,7 +52,7 @@ function render(){
       html+=`<p class="small">위험도와 통과 경로를 기준으로 정렬한 보행 개선 검토 지점입니다. 시설 종류와 설치 가능 여부는 현장 확인이 필요합니다.</p>`;
       if(segmentError)html+='<div class="notice">개선 검토 지점 데이터를 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</div>';
       else if(!segments.length)html+='<div class="notice">등록된 개선 검토 지점이 없습니다.</div>';
-      html+=segments.slice(0,12).map((s,i)=>`<button class="candidate ${i===state.segment?"selected":""}" data-segment="${i}" aria-pressed="${i===state.segment}"><div class="row"><strong>${esc(s["도로명"]||"도로명 미등록 구간")}</strong><span class="rank">${i+1}순위</span></div><div class="priority-meter"><i style="width:${Math.min(100,Number(s["우선점수"]||0)*8)}%"></i></div><div class="tags"><span>구간 ${esc(s["길이_m"])}m</span><span>위험도 ${esc(s["위험도"])}</span><span>통과 경로 ${esc(s["통과경로수"])}개</span></div><div class="small">${esc(s["관련단지"])}</div></button>`).join("");
+      html+=segments.slice(0,12).map((s,i)=>`<button class="candidate ${i===state.segment?"selected":""}" data-segment="${i}" aria-pressed="${i===state.segment}"><div class="row"><strong>${esc(s["도로명"]||"도로명 미등록 구간")}</strong><span class="rank">${i+1}순위</span></div><div class="priority-meter"><i style="width:${Math.min(100,Number(s["우선점수"]||0)*8)}%"></i></div><div class="small reason">${esc(walkingReason(s))}</div><div class="small">${esc(relatedComplexSummary(s))}</div></button>`).join("");
       html+='<p class="small">통과 경로 수는 학생 수가 아닙니다. 표시 지점은 구간의 대표 위치입니다.</p>';
     }else if(state.category==="bus"){
       const items=data.meta.bus_recommendations||[];
@@ -54,12 +66,12 @@ function render(){
   }else{
     html=`<h2 class="panel-title">우리 단지에서 학교까지</h2><p class="panel-lead">출발 단지를 바꾸면 학교별 통학 부담과 안전 경로가 즉시 업데이트됩니다.</p>${selectors()}${tabs([["all","전체 학교"],["초등학교","초등학교"],["중학교","중학교"]],state.schoolLevel,"data-level")}${tabs([["walk","도보"],["bus","버스"]],state.mode,"data-mode")}`;
     if(state.mode==="bus"&&!data.meta.bus_available)html+=`<div class="notice">${data.meta.bus_estimate_available?`노선·배차 원본이 없어 최근접 정류장과 거리 기반으로 계산한 추정값입니다. 실제 버스 시간표가 아닙니다.`:"버스 정류장 데이터 수집 전입니다."}</div>`;
-    const rankedSchools=visibleSchools().map(s=>({school:s,walk:currentComplex().results[s.school_id]?.[state.mode]})).sort((a,b)=>{
+    const rankedSchools=visibleSchools().map(s=>({school:s,walk:currentComplex()?.results[s.school_id]?.[state.mode]})).sort((a,b)=>{
       const at=Number(a.walk?.time_min),bt=Number(b.walk?.time_min);
       if(Number.isFinite(at)&&Number.isFinite(bt))return at-bt;
       return Number.isFinite(at)?-1:Number.isFinite(bt)?1:sortKorean(a.school.name,b.school.name);
     });
-    html+=rankedSchools.map(({school:s,walk:w})=>w?`<button class="school-card ${state.school===s.school_id?"selected":""}" data-school="${esc(s.school_id)}" aria-pressed="${state.school===s.school_id}"><div class="row"><strong>${esc(s.name)}</strong><span class="school-level">${esc(s.school_level||"학교")}</span><span class="score">${fmt(w.time_min)}<small>분</small></span></div><div class="tags"><span>부담 지수 ${fmt(w.index)}</span><span>위험 구간 ${esc(w.risk_len_m)}m</span></div>${state.mode==="bus"?`<div class="small">${esc(w.route_name)}번 · 대기 ${fmt(w.wait_min)}분 · 승차 ${fmt(w.ride_min)}분</div>`:""}</button>`:`<div class="notice">${esc(s.name)} · ${data.meta.bus_available?"계산된 버스 경로 없음":"버스 데이터 미수집"}</div>`).join("");
+    html+=state.complex?rankedSchools.map(({school:s,walk:w})=>w?`<button class="school-card ${state.school===s.school_id?"selected":""}" data-school="${esc(s.school_id)}" aria-pressed="${state.school===s.school_id}"><div class="row"><strong>${esc(s.name)}</strong><span class="school-level">${esc(s.school_level||"학교")}</span><span class="score">${fmt(w.time_min)}<small>분</small></span></div><div class="tags"><span>부담 지수 ${fmt(w.index)}</span><span>위험 구간 ${esc(w.risk_len_m)}m</span></div>${state.mode==="bus"?`<div class="small">${esc(w.route_name)}번 · 대기 ${fmt(w.wait_min)}분 · 승차 ${fmt(w.ride_min)}분</div>`:""}</button>`:`<div class="notice">${esc(s.name)} · ${data.meta.bus_available?"계산된 버스 경로 없음":"버스 데이터 미수집"}</div>`).join(""):'<div class="notice">출발 단지를 선택하면 학교별 통학 결과를 확인할 수 있습니다.</div>';
     html+='<p class="small">단지 중심점 기준 추정입니다. 실제 출입구와 보행 환경에 따라 시간이 달라질 수 있습니다.</p>';
   }
   $("panel").innerHTML=html;bindPanel();drawMap();
@@ -114,7 +126,7 @@ function drawMap(){
   const {paths,points}=scene();$("mapTitle").textContent=state.page==="recommend"?"통학 부담과 개선 검토 지점":"우리 단지의 통학 경로";
   if(map){
     layers.forEach(l=>l.setMap(null));layers=[];const bounds=new naver.maps.LatLngBounds(points[0] ? new naver.maps.LatLng(points[0].lat,points[0].lon) : map.getCenter(), points[0] ? new naver.maps.LatLng(points[0].lat,points[0].lon) : map.getCenter());
-    for(const p of points){const el=document.createElement("button");el.className="map-pin"+(p.type==="school"?" school":"")+(p.type==="candidate"?` candidate-pin ${state.category}-pin`:"");el.textContent=p.displayLabel|| (p.type==="complex"?p.label.replace(/^오산세교2 /,""):p.label);el.style.background=p.color;if(state.page==="recommend"&&p.type==="candidate")el.style.opacity=p.id===state.segment?"1":".4";el.onclick=()=>selectPoint(p);const pos=new naver.maps.LatLng(p.lat,p.lon);bounds.extend(pos);const o=new naver.maps.Marker({position:pos,icon:{content:el,anchor:new naver.maps.Point(0,0)},zIndex:p.type==="candidate"?(p.id===state.segment?8:5):2});o.setMap(map);layers.push(o);}
+    for(const p of points){const el=document.createElement("button");el.className="map-pin"+(state.page==="commute"?" commute-pin":"")+(p.type==="school"?" school":"")+(p.type==="candidate"?` candidate-pin ${state.category}-pin`:"");el.textContent=p.displayLabel|| (p.type==="complex"?p.label.replace(/^오산세교2 /,""):p.label);el.style.background=p.color;if(state.page==="recommend"&&p.type==="candidate")el.style.opacity=p.id===state.segment?"1":".4";el.onclick=()=>selectPoint(p);const pos=new naver.maps.LatLng(p.lat,p.lon);bounds.extend(pos);const o=new naver.maps.Marker({position:pos,icon:{content:el,anchor:new naver.maps.Point(0,0)},zIndex:p.type==="candidate"?(p.id===state.segment?8:5):2});o.setMap(map);layers.push(o);}
     for(const p of paths){const path=p.coords.map(([a,b])=>new naver.maps.LatLng(a,b));path.forEach(pos=>bounds.extend(pos));const l=new naver.maps.Polyline({map,path,strokeColor:p.color,strokeWeight:5,strokeStyle:p.dash?"shortdash":"solid",strokeOpacity:.9});layers.push(l);}
     map.fitBounds(bounds,{top:80,right:60,bottom:60,left:60});return;
   }
@@ -170,7 +182,7 @@ async function initMap(){
   try{
     const r=await fetch("../data/index-lite.json?v=20261016-1");if(!r.ok)throw new Error("통학 데이터 응답 오류");data=await r.json();if(!data.complexes?.length||!data.schools?.length)throw new Error("통학 데이터가 비어 있습니다");
     try{const sr=await fetch("../data/priority_segments.csv?v=20261016",{cache:"no-store"});if(!sr.ok)throw new Error();segments=csv(await sr.text());}catch{segmentError=true;}
-    state.complex=data.complexes[0].id;state.school=data.schools[0].school_id;
+    state.complex=null;state.school=null;
     $("coverage").textContent=`${data.complexes.length}개 단지 · ${data.schools.length}개 학교`;
     $("riskCount").textContent=`${segments.length || "—"}개`;
     $("schoolCount").textContent=`${data.schools.length}곳`;

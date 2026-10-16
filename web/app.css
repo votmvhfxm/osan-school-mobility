@@ -25,3 +25,4 @@
 .map-pin{border-radius:50%;padding:0;width:30px;height:30px;display:grid;place-items:center;line-height:1}
 .map-pin.candidate-pin{width:30px;height:30px}
 .map-pin.bus-pin,.map-pin.school-pin{width:38px;height:38px}
+.map-pin.commute-pin{border-radius:9px;padding:4px 8px;width:auto;height:auto;display:inline-grid;line-height:1}
