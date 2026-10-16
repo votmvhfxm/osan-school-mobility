@@ -211,16 +211,27 @@ def bus_option(net, bus, cid, sid, c_ll, s_ll, walk_cache):
         destination = min(bus["stops"].values(), key=lambda s: hav(s_ll, (float(s["y"]), float(s["x"]))))
         access_m = hav(c_ll, (float(origin["y"]), float(origin["x"])))
         egress_m = hav(s_ll, (float(destination["y"]), float(destination["x"])))
-        road_m = hav((float(origin["y"]), float(origin["x"])), (float(destination["y"]), float(destination["x"]))) * 1.25
+        road_route = net.route(
+            (float(origin["y"]), float(origin["x"])),
+            (float(destination["y"]), float(destination["x"])),
+            weight="length",
+        )
+        road_m = road_route["dist_m"] if road_route else hav(
+            (float(origin["y"]), float(origin["x"])),
+            (float(destination["y"]), float(destination["x"])),
+        ) * 1.25
         wait = 8.0
         ride = road_m / (BUS_KMH * 1000 / 60)
         best = {
             "_est": access_m / WALK_M_PER_MIN * 1.3 + wait + ride + egress_m / WALK_M_PER_MIN * 1.3,
-            "route_id": None, "route_name": "노선 미수집 · 거리 기반 추정", "alloc_min": None,
+            "route_id": None, "route_name": "개발계정 트래픽 제한 · 도로망 기반 추정", "alloc_min": None,
             "wait_min": wait, "ride_min": round(ride, 1), "n_stops": None,
             "board": {"name": origin.get("stationName"), "ll": r6((float(origin["y"]), float(origin["x"])))},
             "alight": {"name": destination.get("stationName"), "ll": r6((float(destination["y"]), float(destination["x"])))},
-            "bus_path": [r6((float(origin["y"]), float(origin["x"]))), r6((float(destination["y"]), float(destination["x"])))],
+            "bus_path": road_route["path"] if road_route else [
+                r6((float(origin["y"]), float(origin["x"]))),
+                r6((float(destination["y"]), float(destination["x"]))),
+            ],
             "estimated": True,
         }
     if best is None:

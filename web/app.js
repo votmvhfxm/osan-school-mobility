@@ -68,7 +68,7 @@ function render(){
       html+='<p class="small">통과 경로 수는 학생 수가 아닙니다. 표시 지점은 구간의 대표 위치입니다.</p>';
     }else if(state.category==="bus"){
       const items=data.meta.bus_recommendations||[];
-      html+=`<div class="notice">노선·배차 원본 없이 정류장 좌표와 직선거리 기반으로 계산한 <strong>배치 검토용 추정</strong>입니다. 실제 노선 신설·이전 결정 전 현장 확인이 필요합니다.</div>`;
+      html+=`<div class="notice">노선·배차 데이터는 개발계정 트래픽 제한으로 확보하지 못해, 정류장 위치와 도로망 거리를 바탕으로 계산한 <strong>배치 검토용 추정</strong>입니다. 실제 노선 신설·이전 결정 전 현장 확인이 필요합니다.</div>`;
       html+=items.length?items.map((x,i)=>`<button class="candidate ${i===state.segment?"selected":""}" data-segment="${i}" aria-pressed="${i===state.segment}"><div class="row"><strong>${i+1}. ${esc(x.stop)}</strong></div><div class="small">${esc(busRecommendationReason(x))}</div><div class="small">${esc(x.complex)} 단지 통학 개선 검토</div></button>`).join(""):'<div class="empty"><h3>정류장 좌표가 없습니다</h3><p>정류장 데이터를 먼저 수집해야 합니다.</p></div>';
     }else{
       const items=data.meta.school_recommendations||[];
@@ -77,7 +77,7 @@ function render(){
     }
   }else{
     html=`<h2 class="panel-title">우리 단지에서 학교까지</h2><p class="panel-lead">출발 단지를 바꾸면 학교별 통학 부담과 안전 경로가 즉시 업데이트됩니다.</p>${selectors()}${tabs([["all","전체 학교"],["초등학교","초등학교"],["중학교","중학교"]],state.schoolLevel,"data-level")}${tabs([["walk","도보"],["bus","버스"]],state.mode,"data-mode")}`;
-    if(state.mode==="bus"&&!data.meta.bus_available)html+=`<div class="notice">${data.meta.bus_estimate_available?`노선·배차 원본이 없어 최근접 정류장과 거리 기반으로 계산한 추정값입니다. 실제 버스 시간표가 아닙니다.`:"버스 정류장 데이터 수집 전입니다."}</div>`;
+    if(state.mode==="bus"&&!data.meta.bus_available)html+=`<div class="notice">${data.meta.bus_estimate_available?`노선·배차 데이터는 개발계정 트래픽 제한으로 확보하지 못해, 최근접 정류장과 도로망 거리로 계산한 추정값입니다. 실제 버스 시간표가 아닙니다.`:"버스 정류장 데이터 수집 전입니다."}</div>`;
     const rankedSchools=visibleSchools().map(s=>({school:s,walk:currentComplex()?.results[s.school_id]?.[state.mode]})).sort((a,b)=>{
       const at=Number(a.walk?.time_min),bt=Number(b.walk?.time_min);
       if(Number.isFinite(at)&&Number.isFinite(bt))return at-bt;
