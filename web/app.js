@@ -47,10 +47,6 @@ const busRecommendationReason=x=>{
   const burdenText=Number.isFinite(index)?`평균 통학 부담 지수 ${index.toFixed(1)}로 부담이 큰 단지`:"통학 부담이 큰 단지";
   return `${burdenText}의 ${distanceText}라서, 정류장 접근성을 높이고 버스 이용을 검토하기 좋은 위치입니다.`;
 };
-const schoolRecommendationReason=x=>{
-  const index=Number(x.mean_index),indexText=Number.isFinite(index)?`이 권역의 평균 통학 부담 지수는 ${index.toFixed(1)}로 `:"";
-  return `${indexText}${x.reason||"통학 부담이 큰 권역"}이므로, 학교 배치나 신설 후보로 우선 검토할 필요가 있습니다.`;
-};
 function selectors(school=false){
   const selected=currentComplex();
   const matches=complexMatches(state.complexQuery);
@@ -77,7 +73,7 @@ function render(){
     }else{
       const items=data.meta.school_recommendations||[];
       html+=`<div class="notice">새 학교의 확정 위치가 아니라, 현재 단지·학교 통학 부담을 바탕으로 산출한 <strong>학교 후보 검토 권역</strong>입니다. 부지·학생 수요·수용 여력 확인이 필요합니다.</div>`;
-      html+=items.length?items.map((x,i)=>`<button class="candidate ${i===state.segment?"selected":""}" data-segment="${i}" aria-pressed="${i===state.segment}"><div class="row"><strong>${i+1}. ${esc(x.area)} 권역</strong><span class="rank">부담 ${fmt(x.mean_index)}</span></div><div class="small">${esc(schoolRecommendationReason(x))}</div></button>`).join(""):'<div class="empty"><h3>학교 분석 데이터가 없습니다</h3><p>통학 계산 결과를 먼저 생성해야 합니다.</p></div>';
+      html+=items.length?items.map((x,i)=>`<button class="candidate ${i===state.segment?"selected":""}" data-segment="${i}" aria-pressed="${i===state.segment}"><div class="row"><strong>${i+1}. ${esc(x.area)} 권역</strong><span class="rank">부담 ${fmt(x.mean_index)}</span></div><div class="small">${esc(x.reason)}</div></button>`).join(""):'<div class="empty"><h3>학교 분석 데이터가 없습니다</h3><p>통학 계산 결과를 먼저 생성해야 합니다.</p></div>';
     }
   }else{
     html=`<h2 class="panel-title">우리 단지에서 학교까지</h2><p class="panel-lead">출발 단지를 바꾸면 학교별 통학 부담과 안전 경로가 즉시 업데이트됩니다.</p>${selectors()}${tabs([["all","전체 학교"],["초등학교","초등학교"],["중학교","중학교"]],state.schoolLevel,"data-level")}${tabs([["walk","도보"],["bus","버스"]],state.mode,"data-mode")}`;
