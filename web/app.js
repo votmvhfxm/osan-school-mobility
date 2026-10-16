@@ -104,7 +104,12 @@ function scene(){
   }
   return {paths,points:points.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon))};
 }
-function selectPoint(p){if(p.type==="candidate"){state.segment=p.id;render();}else if(p.type==="complex"){state.complex=p.id;if(state.page==="recommend")navigate("commute");else render();}}
+function scrollToSelectedSegment(){
+  const card=document.querySelector(`[data-segment="${state.segment}"]`);
+  if(!card)return;
+  requestAnimationFrame(()=>card.scrollIntoView({behavior:"smooth",block:"nearest",inline:"nearest"}));
+}
+function selectPoint(p){if(p.type==="candidate"){state.segment=p.id;render();scrollToSelectedSegment();}else if(p.type==="complex"){state.complex=p.id;if(state.page==="recommend")navigate("commute");else render();}}
 function drawMap(){
   const {paths,points}=scene();$("mapTitle").textContent=state.page==="recommend"?"통학 부담과 개선 검토 지점":"우리 단지의 통학 경로";
   if(map){
