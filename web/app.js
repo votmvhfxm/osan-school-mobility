@@ -24,12 +24,17 @@ const complexMatches=(query)=>{
   return query?matches.slice(0,8):matches;
 };
 const walkingReason=s=>{
-  const paths=Number(s["통과경로수"]||0),risk=Number(s["위험도"]||0),length=Number(s["길이_m"]||0);
-  const riskDescription=risk>=.75?"보행 위험 요소가 많이 겹친":risk>=.6?"보행 위험 요소가 확인된":"보행 안전을 점검할 필요가 있는";
-  if(paths>=200&&risk>=.6)return `${riskDescription} ${length}m 구간이고 ${paths}개 통학 경로가 지나므로, 개선하면 많은 학생의 통학 안전을 함께 높일 수 있어 우선순위가 높습니다.`;
-  if(risk>=.6)return `${riskDescription} ${length}m 구간이라 학생들이 안심하고 지날 수 있도록 보행환경 개선이 필요합니다.`;
-  if(paths>=100)return `${length}m 구간에 ${paths}개 통학 경로가 집중되어, 개선하면 여러 학생의 통학 안전을 함께 높일 수 있습니다.`;
-  return `${length}m 구간의 보행 환경을 점검하고 학생들이 더 안심하고 지날 수 있도록 개선을 검토합니다.`;
+  const paths=Number(s["통과경로수"]||0),length=Number(s["길이_m"]||0),lanes=Number(s["최대차로수"]||0);
+  const crossings=Number(s["횡단보도수"]||0),unsignal=Number(s["무신호횡단보도수"]||0);
+  const intersections=Number(s["교차로수"]||0),schoolZone=Number(s["보호구역구간수"]||0);
+  const factors=[];
+  if(lanes>=4)factors.push(`차로가 ${lanes}개인 차량 통행 도로`);
+  if(unsignal)factors.push(`무신호 횡단보도 ${unsignal}곳`);
+  if(intersections)factors.push(`교차로 ${intersections}곳`);
+  if(crossings&&!unsignal)factors.push(`횡단보도 ${crossings}곳`);
+  if(!schoolZone)factors.push("어린이보호구역 밖 구간");
+  const detail=factors.length?factors.join(", ")+"이 확인되어":"도로 구조와 주변 보행 환경을 종합해";
+  return `${detail} ${length}m 구간의 보행 위험이 높게 평가되었습니다. ${paths}개 통학 경로가 지나므로 개선하면 학생들이 더 안전하게 이동할 수 있습니다.`;
 };
 const relatedComplexSummary=s=>{
   const names=String(s["관련단지"]||"").split(",").map(v=>v.trim()).filter(Boolean),count=Number(s["관련단지수"]||names.length);
@@ -48,7 +53,7 @@ function render(){
   document.querySelectorAll("[data-page]").forEach(b=>{if(b.dataset.page===state.page)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current");});
   let html="";
   if(state.page==="recommend"){
-    html=`<span class="pill">우선 살펴볼 곳</span><h2 class="panel-title">어디부터 바꾸면 좋을까요?</h2><p class="panel-lead">학생이 많이 지나는 길과 위험도가 높은 구간을 함께 보고, 예산을 먼저 써야 할 위치를 제안합니다.</p>${tabs([["walk","보행 환경"],["bus","버스정류장"],["school","학교 위치"]],state.category,"data-category")}`;
+    html=`<span class="pill">우선 살펴볼 곳</span><h2 class="panel-title">어디부터 바꾸면 좋을까요?</h2><p class="panel-lead">학생이 많이 지나는 길과 차량 통행·횡단·교차로 환경을 함께 보고, 예산을 먼저 써야 할 위치를 제안합니다.</p>${tabs([["walk","보행 환경"],["bus","버스정류장"],["school","학교 위치"]],state.category,"data-category")}`;
     if(state.category==="walk"){
       html+=`<p class="small">위험 요소가 얼마나 확인되는지, 몇 개의 통학 경로가 지나는지, 구간이 얼마나 긴지를 함께 고려해 우선순위를 정했습니다. 실제 시설 종류와 설치 가능 여부는 현장 확인이 필요합니다.</p>`;
       if(segmentError)html+='<div class="notice">개선 검토 지점 데이터를 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</div>';

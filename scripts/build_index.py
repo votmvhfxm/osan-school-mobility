@@ -10,6 +10,7 @@ import networkx as nx
 import numpy as np
 import osmnx as ox
 import pandas as pd
+import geopandas as gpd
 
 from common import DATA, RAW
 
@@ -37,8 +38,14 @@ class Net:
     def __init__(self):
         G = ox.load_graphml(RAW / "osm_walk.graphml")
         risk = pd.read_csv(DATA / "edge_risk.csv").set_index(["u", "v", "key"])["risk"].to_dict()
+        edge_features = gpd.read_file(DATA / "edges.gpkg", layer="edges").set_index(["u", "v", "key"])
         for u, v, k, d in G.edges(keys=True, data=True):
             d["risk"] = float(risk.get((u, v, k), 0.0))
+            if (u, v, k) in edge_features.index:
+                feature = edge_features.loc[(u, v, k)]
+                for name in ("hw", "hw_rank", "lanes_n", "n_intersections", "n_crossings",
+                             "n_signal_crossings", "n_unsignal_crossings", "in_school_zone", "ped_only"):
+                    d[name] = feature.get(name)
         self.G = nx.MultiDiGraph(G)
         self.Gu = ox.convert.to_undirected(G)  # 보행은 일방통행 무시
         for u, v, k, d in self.Gu.edges(keys=True, data=True):
@@ -66,7 +73,16 @@ class Net:
             else:
                 coords = [(self.Gu.nodes[u]["y"], self.Gu.nodes[u]["x"]), (self.Gu.nodes[v]["y"], self.Gu.nodes[v]["x"])]
             segs.append({"len": float(d["length"]), "risk": float(d.get("risk", 0)), "coords": coords,
-                         "name": d.get("name") if isinstance(d.get("name"), str) else None, "uv": (min(u, v), max(u, v))})
+                         "name": d.get("name") if isinstance(d.get("name"), str) else None,
+                         "hw": d.get("hw"), "hw_rank": float(d.get("hw_rank", 0) or 0),
+                         "lanes_n": float(d.get("lanes_n", 0) or 0),
+                         "n_intersections": float(d.get("n_intersections", 0) or 0),
+                         "n_crossings": float(d.get("n_crossings", 0) or 0),
+                         "n_signal_crossings": float(d.get("n_signal_crossings", 0) or 0),
+                         "n_unsignal_crossings": float(d.get("n_unsignal_crossings", 0) or 0),
+                         "in_school_zone": int(d.get("in_school_zone", 0) or 0),
+                         "ped_only": int(d.get("ped_only", 0) or 0),
+                         "uv": (min(u, v), max(u, v))})
         # 출발·도착 점에서 가장 가까운 노드까지의 접근 거리
         snap = hav(a, (self.Gu.nodes[na]["y"], self.Gu.nodes[na]["x"])) + hav(b, (self.Gu.nodes[nb]["y"], self.Gu.nodes[nb]["x"]))
         return summarize(segs, snap, a, b)
@@ -87,7 +103,10 @@ def summarize(segs, snap, a, b):
     for s in segs:
         if s["risk"] >= RISK_THRESHOLD:
             if cur is None:
-                cur = {"coords": list(s["coords"]), "len": 0, "risk_max": 0, "names": set(), "uvs": []}
+                cur = {"coords": list(s["coords"]), "len": 0, "risk_max": 0, "names": set(), "uvs": [],
+                       "road_types": set(), "max_lanes": 0, "intersections": 0, "crossings": 0,
+                       "signal_crossings": 0, "unsignal_crossings": 0, "school_zone_edges": 0,
+                       "ped_only_edges": 0, "edge_count": 0}
             else:
                 cur["coords"] += s["coords"][1:]
             cur["len"] += s["len"]
@@ -95,6 +114,16 @@ def summarize(segs, snap, a, b):
             cur["uvs"].append(s["uv"])
             if s["name"]:
                 cur["names"].add(s["name"])
+            if s["hw"]:
+                cur["road_types"].add(s["hw"])
+            cur["max_lanes"] = max(cur["max_lanes"], s["lanes_n"])
+            cur["intersections"] += s["n_intersections"]
+            cur["crossings"] += s["n_crossings"]
+            cur["signal_crossings"] += s["n_signal_crossings"]
+            cur["unsignal_crossings"] += s["n_unsignal_crossings"]
+            cur["school_zone_edges"] += s["in_school_zone"]
+            cur["ped_only_edges"] += s["ped_only"]
+            cur["edge_count"] += 1
         elif cur is not None:
             runs.append(cur)
             cur = None
@@ -109,6 +138,12 @@ def summarize(segs, snap, a, b):
         "path": path,
         "risk_segments": [{"coords": [r6(c) for c in r["coords"]], "len_m": round(r["len"]),
                            "risk": round(r["risk_max"], 2), "road": ", ".join(sorted(r["names"])) or None,
+                           "road_types": ", ".join(sorted(r["road_types"])),
+                           "max_lanes": round(r["max_lanes"]), "intersections": round(r["intersections"]),
+                           "crossings": round(r["crossings"]), "signal_crossings": round(r["signal_crossings"]),
+                           "unsignal_crossings": round(r["unsignal_crossings"]),
+                           "school_zone_edges": round(r["school_zone_edges"]),
+                           "ped_only_edges": round(r["ped_only_edges"]), "edge_count": r["edge_count"],
                            "key": "|".join(f"{u}-{v}" for u, v in r["uvs"])} for r in runs],
     }
 
@@ -358,6 +393,12 @@ def main():
         for sid, r in c["results"].items():
             for rs in r["walk"]["risk_segments"]:
                 d = seg.setdefault(rs["key"], {"도로명": rs["road"], "길이_m": rs["len_m"], "위험도": rs["risk"],
+                                               "도로유형": rs.get("road_types"), "최대차로수": rs.get("max_lanes"),
+                                               "교차로수": rs.get("intersections"), "횡단보도수": rs.get("crossings"),
+                                               "신호횡단보도수": rs.get("signal_crossings"),
+                                               "무신호횡단보도수": rs.get("unsignal_crossings"),
+                                               "보호구역구간수": rs.get("school_zone_edges"),
+                                               "보행전용구간수": rs.get("ped_only_edges"),
                                                "통과경로수": 0, "관련단지": set(), "관련학교": set(),
                                                "lat": rs["coords"][len(rs["coords"]) // 2][0],
                                                "lon": rs["coords"][len(rs["coords"]) // 2][1]})
