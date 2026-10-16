@@ -25,10 +25,11 @@ const complexMatches=(query)=>{
 };
 const walkingReason=s=>{
   const paths=Number(s["통과경로수"]||0),risk=Number(s["위험도"]||0),length=Number(s["길이_m"]||0);
-  if(paths>=200&&risk>=.6)return `많은 통학 경로(${paths}개)가 지나고 위험도 ${risk.toFixed(2)}가 높은 구간이라, 우선적인 보행환경 개선이 필요합니다.`;
-  if(risk>=.6)return `위험도 ${risk.toFixed(2)}가 높은 구간으로, 학생들이 안심하고 지날 수 있도록 보행환경 개선이 필요합니다.`;
-  if(paths>=100)return `많은 통학 경로(${paths}개)가 지나는 구간이라, 개선하면 여러 학생의 통학 안전을 함께 높일 수 있습니다.`;
-  return `${length}m 구간의 통학 안전을 높이고 학생들이 더 안심하고 지날 수 있도록 보행환경 개선을 검토합니다.`;
+  const riskDescription=risk>=.75?"보행 위험 요소가 많이 겹친":risk>=.6?"보행 위험 요소가 확인된":"보행 안전을 점검할 필요가 있는";
+  if(paths>=200&&risk>=.6)return `${riskDescription} ${length}m 구간이고 ${paths}개 통학 경로가 지나므로, 개선하면 많은 학생의 통학 안전을 함께 높일 수 있어 우선순위가 높습니다.`;
+  if(risk>=.6)return `${riskDescription} ${length}m 구간이라 학생들이 안심하고 지날 수 있도록 보행환경 개선이 필요합니다.`;
+  if(paths>=100)return `${length}m 구간에 ${paths}개 통학 경로가 집중되어, 개선하면 여러 학생의 통학 안전을 함께 높일 수 있습니다.`;
+  return `${length}m 구간의 보행 환경을 점검하고 학생들이 더 안심하고 지날 수 있도록 개선을 검토합니다.`;
 };
 const relatedComplexSummary=s=>{
   const names=String(s["관련단지"]||"").split(",").map(v=>v.trim()).filter(Boolean),count=Number(s["관련단지수"]||names.length);
@@ -49,7 +50,7 @@ function render(){
   if(state.page==="recommend"){
     html=`<span class="pill">우선 살펴볼 곳</span><h2 class="panel-title">어디부터 바꾸면 좋을까요?</h2><p class="panel-lead">학생이 많이 지나는 길과 위험도가 높은 구간을 함께 보고, 예산을 먼저 써야 할 위치를 제안합니다.</p>${tabs([["walk","보행 환경"],["bus","버스정류장"],["school","학교 위치"]],state.category,"data-category")}`;
     if(state.category==="walk"){
-      html+=`<p class="small">위험도와 통과 경로를 기준으로 정렬한 보행 개선 검토 지점입니다. 시설 종류와 설치 가능 여부는 현장 확인이 필요합니다.</p>`;
+      html+=`<p class="small">위험 요소가 얼마나 확인되는지, 몇 개의 통학 경로가 지나는지, 구간이 얼마나 긴지를 함께 고려해 우선순위를 정했습니다. 실제 시설 종류와 설치 가능 여부는 현장 확인이 필요합니다.</p>`;
       if(segmentError)html+='<div class="notice">개선 검토 지점 데이터를 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</div>';
       else if(!segments.length)html+='<div class="notice">등록된 개선 검토 지점이 없습니다.</div>';
       html+=segments.slice(0,12).map((s,i)=>`<button class="candidate ${i===state.segment?"selected":""}" data-segment="${i}" aria-pressed="${i===state.segment}"><div class="row"><strong>${esc(s["도로명"]||"도로명 미등록 구간")}</strong><span class="rank">${i+1}순위</span></div><div class="priority-meter"><i style="width:${Math.min(100,Number(s["우선점수"]||0)*8)}%"></i></div><div class="small reason">${esc(walkingReason(s))}</div><div class="small">${esc(relatedComplexSummary(s))}</div></button>`).join("");
