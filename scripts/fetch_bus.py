@@ -5,6 +5,7 @@
 import json
 import sys
 import time
+import xml.etree.ElementTree as ET
 from hashlib import sha256
 
 import pandas as pd
@@ -19,6 +20,9 @@ CACHE_FILE = RAW / "bus_api_cache.json"
 REQUEST_GAP = 0.35
 CACHE_TTL_SECONDS = 24 * 60 * 60
 FAILURES = []
+FAILURE_STREAK = 0
+SESSION = requests.Session()
+PERMANENT_CODES = {'20', '21', '22', '30', '31', '32', '33'}
 
 
 def load_cache():
@@ -43,26 +47,53 @@ def save_cache():
 
 
 def call(path, **params):
+    global FAILURE_STREAK
     key = cache_key(path, params)
     cached = API_CACHE.get(key)
     if isinstance(cached, dict) and "fetched_at" in cached and time.time() - cached["fetched_at"] < CACHE_TTL_SECONDS:
+        FAILURE_STREAK = 0
         return cached["body"]
     for i in range(4):
         try:
-            r = requests.get(f"{BASE}/{path}", params={"serviceKey": KEY, "format": "json", **params}, timeout=12)
+            r = SESSION.get(f"{BASE}/{path}", params={"serviceKey": KEY, "format": "json", **params}, timeout=12)
+            if r.status_code in (401, 403):
+                raise SystemExit("Bus API authorization denied; verify repository DATA_GO_KR_KEY and service approvals. Published data preserved.")
             if r.status_code == 429:
                 delay = 3 * (i + 1)
                 print(f"  rate limited {path}; retrying in {delay}s", flush=True)
                 time.sleep(delay)
                 continue
             r.raise_for_status()
-            response = r.json().get("response", {})
+            try:
+                payload = r.json()
+            except ValueError:
+                try:
+                    xml = ET.fromstring(r.content)
+                    code = xml.findtext(".//returnReasonCode") or xml.findtext(".//resultCode")
+                except ET.ParseError:
+                    code = None
+                if str(code) in PERMANENT_CODES:
+                    raise SystemExit("Bus API permanent gateway error code " + str(code) + "; published data preserved.")
+                raise ValueError("Invalid bus API response") from None
+            gateway = payload.get("OpenAPI_ServiceResponse", {}).get("cmmMsgHeader", {})
+            code = str(gateway.get("returnReasonCode", ""))
+            if code in PERMANENT_CODES:
+                raise SystemExit("Bus API permanent gateway error code " + code + "; published data preserved.")
+            response = payload.get("response", {})
             if "msgHeader" in response and response["msgHeader"].get("resultCode") not in (0, "0", None):
                 if str(response["msgHeader"].get("resultCode")) == "4":
+                    FAILURE_STREAK = 0
                     return {}
-                FAILURES.append({"path": path, "code": response["msgHeader"].get("resultCode")})
+                code = str(response["msgHeader"].get("resultCode"))
+                if code in PERMANENT_CODES:
+                    raise SystemExit("Bus API permanent error code " + code + "; published data preserved.")
+                FAILURE_STREAK += 1
+                if FAILURE_STREAK >= 3:
+                    raise SystemExit("Three consecutive bus API failures; published data preserved.")
+                FAILURES.append({"path": path, "code": code})
                 print("  API unavailable", path, "code", response["msgHeader"].get("resultCode"), flush=True)
                 return None
+            FAILURE_STREAK = 0
             body = response.get("msgBody") or {}
             if body:
                 API_CACHE[key] = {"fetched_at": time.time(), "body": body}
@@ -73,6 +104,9 @@ def call(path, **params):
             print("  err", path, type(e).__name__)
             sys.stdout.flush()
             time.sleep(1 + i)
+    FAILURE_STREAK += 1
+    if FAILURE_STREAK >= 3:
+        raise SystemExit("Three consecutive bus API failures; published data preserved.")
     FAILURES.append({"path": path, "code": "request_failed"})
     return None
 

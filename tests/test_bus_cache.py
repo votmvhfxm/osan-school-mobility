@@ -13,12 +13,13 @@ import fetch_bus as bus
 class BusCacheTests(unittest.TestCase):
     def setUp(self):
         bus.API_CACHE = {}
+        bus.FAILURE_STREAK = 0
         bus.FAILURES.clear()
 
     def test_fresh_cache_avoids_api(self):
         key = bus.cache_key("path", {"stationId": "1"})
         bus.API_CACHE[key] = {"fetched_at": time.time(), "body": {"value": 1}}
-        with patch.object(bus.requests, "get") as get:
+        with patch.object(bus.SESSION, "get") as get:
             self.assertEqual(bus.call("path", stationId="1"), {"value": 1})
             get.assert_not_called()
 
@@ -28,16 +29,30 @@ class BusCacheTests(unittest.TestCase):
         response.json.return_value = {"response": {"msgHeader": {"resultCode": 0}, "msgBody": {"value": 2}}}
         for old in ({"value": 1}, {"fetched_at": 0, "body": {"value": 1}}):
             bus.API_CACHE[key] = old
-            with patch.object(bus.requests, "get", return_value=response), patch.object(bus, "save_cache"), patch.object(bus.time, "sleep"):
+            with patch.object(bus.SESSION, "get", return_value=response), patch.object(bus, "save_cache"), patch.object(bus.time, "sleep"):
                 self.assertEqual(bus.call("path"), {"value": 2})
                 self.assertIn("fetched_at", bus.API_CACHE[key])
 
     def test_errors_do_not_print_secret_request_url(self):
         output = io.StringIO()
-        with patch.object(bus.requests, "get", side_effect=bus.requests.RequestException("https://example.com?serviceKey=SECRET_VALUE")), patch.object(bus.time, "sleep"), redirect_stdout(output):
+        with patch.object(bus.SESSION, "get", side_effect=bus.requests.RequestException("https://example.com?serviceKey=SECRET_VALUE")), patch.object(bus.time, "sleep"), redirect_stdout(output):
             self.assertIsNone(bus.call("path"))
         self.assertNotIn("SECRET_VALUE", output.getvalue())
         self.assertEqual(len(bus.FAILURES), 1)
+
+    def test_permission_denied_stops_immediately(self):
+        response = Mock(status_code=403)
+        with patch.object(bus.SESSION, "get", return_value=response) as get:
+            with self.assertRaises(SystemExit):
+                bus.call("path")
+            self.assertEqual(get.call_count, 1)
+
+    def test_repeated_failures_do_not_scan_entire_city(self):
+        with patch.object(bus.SESSION, "get", side_effect=bus.requests.RequestException("private")), patch.object(bus.time, "sleep"):
+            self.assertIsNone(bus.call("path"))
+            self.assertIsNone(bus.call("path"))
+            with self.assertRaises(SystemExit):
+                bus.call("path")
 
 if __name__ == "__main__":
     unittest.main()
