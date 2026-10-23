@@ -15,6 +15,7 @@ import geopandas as gpd
 
 from common import DATA, RAW
 from build_lite import write_indexes
+from bus_geometry import align_stations, cumulative_lengths
 
 # ---- 지수 가중치 (README 참고) ----
 W_TIME, W_RISK, W_WAIT = 0.4, 0.4, 0.2
@@ -170,6 +171,9 @@ def load_bus():
             rt["pos"].setdefault(s["stationId"], []).append(s["seq"])
         if rt.get("stations"):
             valid_routes += 1
+        shape = rt.get("shape") or []
+        rt["_shape_indices"] = align_stations(sorted(rt.get("stations", []), key=lambda s: s["seq"]), shape)
+        rt["_shape_lengths"] = cumulative_lengths(shape) if len(shape) >= 2 else []
     return b if b.get("stops") else None
 
 
@@ -207,6 +211,11 @@ def bus_option(net, bus, cid, sid, c_ll, s_ll, walk_cache):
                             continue
                         ride_m = sum(hav((float(st[q]["y"]), float(st[q]["x"])), (float(st[q + 1]["y"]), float(st[q + 1]["x"])))
                                      for q in range(qa, qb) if q in st and q + 1 in st)
+                        start = rt["_shape_indices"].get(qa)
+                        end = rt["_shape_indices"].get(qb)
+                        geometry_ok = start is not None and end is not None and end > start
+                        if geometry_ok:
+                            ride_m = float(rt["_shape_lengths"][end] - rt["_shape_lengths"][start])
                         n_stops = qb - qa
                         ride = ride_m / (BUS_KMH * 1000 / 60) + n_stops * BUS_STOP_DWELL_MIN
                         wait = alloc / 2
@@ -215,35 +224,9 @@ def bus_option(net, bus, cid, sid, c_ll, s_ll, walk_cache):
                             best = {"_est": est, "route_id": rid, "route_name": rt["name"], "alloc_min": alloc,
                                     "wait_min": round(wait, 1), "ride_min": round(ride, 1), "n_stops": n_stops,
                                     "board": {"name": sa["name"], "ll": r6(la)}, "alight": {"name": sb["name"], "ll": r6(lb)},
-                                    "bus_path": [r6((float(st[q]["y"]), float(st[q]["x"]))) for q in range(qa, qb + 1) if q in st]}
-    if best is None and bus.get("stops"):
-        origin = min(bus["stops"].values(), key=lambda s: hav(c_ll, (float(s["y"]), float(s["x"]))))
-        destination = min(bus["stops"].values(), key=lambda s: hav(s_ll, (float(s["y"]), float(s["x"]))))
-        access_m = hav(c_ll, (float(origin["y"]), float(origin["x"])))
-        egress_m = hav(s_ll, (float(destination["y"]), float(destination["x"])))
-        road_route = net.route(
-            (float(origin["y"]), float(origin["x"])),
-            (float(destination["y"]), float(destination["x"])),
-            weight="length",
-        )
-        road_m = road_route["dist_m"] if road_route else hav(
-            (float(origin["y"]), float(origin["x"])),
-            (float(destination["y"]), float(destination["x"])),
-        ) * 1.25
-        wait = 8.0
-        ride = road_m / (BUS_KMH * 1000 / 60)
-        best = {
-            "_est": access_m / WALK_M_PER_MIN * 1.3 + wait + ride + egress_m / WALK_M_PER_MIN * 1.3,
-            "route_id": None, "route_name": "정류장·도로망 기반 추정", "alloc_min": None,
-            "wait_min": wait, "ride_min": round(ride, 1), "n_stops": None,
-            "board": {"name": origin.get("stationName"), "ll": r6((float(origin["y"]), float(origin["x"])))},
-            "alight": {"name": destination.get("stationName"), "ll": r6((float(destination["y"]), float(destination["x"])))},
-            "bus_path": road_route["path"] if road_route else [
-                r6((float(origin["y"]), float(origin["x"]))),
-                r6((float(destination["y"]), float(destination["x"]))),
-            ],
-            "estimated": True,
-        }
+                                    "geometry_start": start if geometry_ok else None,
+                                    "geometry_end": end if geometry_ok else None,
+                                    "geometry_source": "gbis_route_line" if geometry_ok else "unavailable"}
     if best is None:
         return None
     w1 = walk_cache(c_ll, tuple(best["board"]["ll"]))
@@ -378,9 +361,14 @@ def main():
         "weights": {"time": W_TIME, "risk": W_RISK, "wait": W_WAIT},
         "walk_m_per_min": WALK_M_PER_MIN, "risk_threshold": RISK_THRESHOLD,
         "bus_available": bus_has_routes,
-        "bus_estimate_available": bool(bus and bus.get("stops")),
+        "bus_estimate_available": False,
         "bus_stop_count": load_bus_stop_count(),
         "bus_collection": bus.get("collection") if bus else None,
+        "source_updated": {
+            "schools": json.loads((DATA / "schools_fetch_status.json").read_text(encoding="utf-8")).get("updated_at") if (DATA / "schools_fetch_status.json").exists() else None,
+            "apartments": json.loads((DATA / "apartments_fetch_status.json").read_text(encoding="utf-8")).get("updated_at") if (DATA / "apartments_fetch_status.json").exists() else None,
+            "bus": bus.get("collection", {}).get("updated_at") if bus else None,
+        },
         "bus_recommendations": bus_recommendations,
         "school_recommendations": school_recommendations,
         "risk_model": json.loads((DATA.parent / "model" / "metrics.json").read_text(encoding="utf-8")).get("mode"),
@@ -392,7 +380,9 @@ def main():
     schools = sc.astype(object).where(pd.notna(sc), None).to_dict("records")
     future_schools = fut.astype(object).where(pd.notna(fut), None).to_dict("records")
     write_indexes(DATA, {"meta": meta, "schools": schools,
-                         "future_schools": future_schools, "complexes": out_cx})
+                         "future_schools": future_schools, "complexes": out_cx,
+                         "bus_geometries": {rid: {"source": "gbis_route_line", "path": rt["shape"]}
+                                            for rid, rt in (bus or {}).get("routes", {}).items() if rt.get("shape")}})
 
     # ---- 우선순위 표 ----
     rows = []

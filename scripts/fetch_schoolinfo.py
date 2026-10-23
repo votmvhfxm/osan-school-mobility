@@ -5,6 +5,7 @@
 """
 import csv
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import urlopen
@@ -49,12 +50,17 @@ def main():
                 "opened": item.get("FOND_YMD", ""),
                 "coord_source": "schoolinfo", "stats_source": "schoolinfo",
             })
+    if not rows:
+        raise SystemExit("No schools returned; existing data preserved.")
     RAW.mkdir(parents=True, exist_ok=True)
     (RAW / "schoolinfo_osan.json").write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
     with (DATA / "schools.csv").open("w", newline="", encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDS)
         writer.writeheader()
         writer.writerows(rows)
+    (DATA / "schools_fetch_status.json").write_text(json.dumps({
+        "updated_at": datetime.now(timezone.utc).isoformat(), "count": len(rows)
+    }), encoding="utf-8")
     print(f"saved {len(rows)} schools: {sum(r['school_level'] == '초등학교' for r in rows)} elementary, "
           f"{sum(r['school_level'] == '중학교' for r in rows)} middle")
 

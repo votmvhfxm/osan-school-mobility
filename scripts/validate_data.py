@@ -26,6 +26,14 @@ def validate():
             assert result["walk"]["path"], "Empty walking route"
             assert result["walk"]["time_min"] >= 0, "Negative route time"
             assert 0 <= result["index"] <= 100, "Invalid index"
+            bus = result.get("bus")
+            if bus:
+                assert not bus.get("estimated"), "Fabricated bus route must not be published"
+                assert not bus.get("bus_path"), "Straight stop-to-stop bus lines must not be published"
+                if bus.get("geometry_source") == "gbis_route_line":
+                    geometry = full["bus_geometries"][str(bus["route_id"])]
+                    start, end = bus["geometry_start"], bus["geometry_end"]
+                    assert geometry["source"] == "gbis_route_line" and 0 <= start < end < len(geometry["path"]), "Invalid official geometry slice"
             combinations += 1
     assert (data / "index-lite.json").stat().st_size < (data / "index.json").stat().st_size / 3, "Light snapshot too large"
     print(f"Validated {len(expected)} apartments, {len(schools)} schools, {combinations} walking routes; matching light/full snapshots.")

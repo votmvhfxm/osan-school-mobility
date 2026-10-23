@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 HEAVY = {"path", "risk_segments", "shortest", "access_path", "egress_path", "ride_path",
-         "walk_to_board", "walk_from_alight", "bus_path", "walk_paths"}
+         "walk_to_board", "walk_from_alight", "bus_path", "walk_paths", "bus_geometries"}
 
 def lightweight(value):
     if isinstance(value, dict):

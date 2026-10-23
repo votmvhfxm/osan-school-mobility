@@ -1,8 +1,13 @@
-name: Refresh apartment and commute data
+name: Refresh and publish commute data
 on:
   workflow_dispatch:
   schedule:
-    - cron: '17 19 * * 0'
+    - cron: '17 19 * * *'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/refresh-data.yml'
+      - 'scripts/**'
 permissions:
   contents: read
 concurrency:
@@ -10,58 +15,80 @@ concurrency:
   cancel-in-progress: false
 jobs:
   refresh:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 180
-    env:
-      DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
-      VWORLD_API_KEY: ${{ secrets.VWORLD_API_KEY }}
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
       - name: Check credentials
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+          VWORLD_API_KEY: ${{ secrets.VWORLD_API_KEY }}
         run: |
-          test -n "$DATA_GO_KR_KEY" || { echo "Missing DATA_GO_KR_KEY secret"; exit 1; }
-          test -n "$VWORLD_API_KEY" || { echo "Missing VWORLD_API_KEY secret"; exit 1; }
+          test -n "$DATA_GO_KR_KEY" || { echo "Missing DATA_GO_KR_KEY repository secret"; exit 1; }
+          test -n "$VWORLD_API_KEY" || { echo "Missing VWORLD_API_KEY repository secret"; exit 1; }
       - name: Install dependencies
         run: pip install pandas geopandas osmnx scikit-learn requests
-      - name: Test collection and security
+      - name: Test
         run: python -m unittest discover -s tests -v
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
-          path: data/raw/apartments_checkpoint.json
-          key: apartments-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: apartments-
+          path: |
+            data/raw/apartments_checkpoint.json
+            data/raw/bus_api_cache.json
+          key: commute-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: commute-
       - name: Collect all apartments
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+          VWORLD_API_KEY: ${{ secrets.VWORLD_API_KEY }}
         run: python scripts/fetch_apartments.py
-      - name: Refresh bus stops and routes
+      - name: Refresh bus stops routes and official geometry
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
         run: python scripts/fetch_bus.py
-      - name: Rebuild commute outputs
-        run: python scripts/build_index.py
-      - name: Validate public outputs
-        run: python scripts/validate_data.py
-      - name: Save checkpoint
+      - name: Refresh schools when configured
+        env:
+          SCHOOLINFO_API_KEY: ${{ secrets.SCHOOLINFO_API_KEY }}
+        run: |
+          if [ -n "$SCHOOLINFO_API_KEY" ]; then python scripts/fetch_schoolinfo.py; fi
+      - name: Rebuild and validate
+        run: |
+          python scripts/build_index.py
+          python scripts/validate_data.py
+          python -c "import json; b=json.load(open('data/raw/bus.json')); assert b['collection']['complete'], 'Incomplete bus refresh; keeping published data'"
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         if: always()
-        uses: actions/cache/save@v4
         with:
-          path: data/raw/apartments_checkpoint.json
-          key: apartments-${{ github.run_id }}-${{ github.run_attempt }}
-      - name: Save report
+          path: |
+            data/raw/apartments_checkpoint.json
+            data/raw/bus_api_cache.json
+          key: commute-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Publish verified public data
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+          VWORLD_API_KEY: ${{ secrets.VWORLD_API_KEY }}
+          SCHOOLINFO_API_KEY: ${{ secrets.SCHOOLINFO_API_KEY }}
+        run: |
+          git add -- data/complexes.csv data/schools.csv data/index.json data/index-lite.json data/priority.csv data/priority_bus.csv data/priority_segments.csv data/apartments_fetch_status.json data/raw/bus.json
+          if [ -f data/schools_fetch_status.json ]; then git add -- data/schools_fetch_status.json; fi
+          python scripts/check_publish.py
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Refresh verified public commute data"
+            git push origin HEAD:main
+          fi
+      - name: Save public collection report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: apartment-collection-report
+          name: collection-report
           path: data/apartments_fetch_status.json
           if-no-files-found: ignore
-      - name: Export refreshed data
-        uses: actions/upload-artifact@v4
-        with:
-          name: refreshed-data
-          path: |
-            data/complexes.csv
-            data/index*.json
-            data/priority*.csv
-            data/apartments_fetch_status.json
-            data/raw/bus.json
 

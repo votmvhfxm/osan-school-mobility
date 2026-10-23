@@ -58,6 +58,8 @@ def call(path, **params):
             r.raise_for_status()
             response = r.json().get("response", {})
             if "msgHeader" in response and response["msgHeader"].get("resultCode") not in (0, "0", None):
+                if str(response["msgHeader"].get("resultCode")) == "4":
+                    return {}
                 FAILURES.append({"path": path, "code": response["msgHeader"].get("resultCode")})
                 print("  API unavailable", path, "code", response["msgHeader"].get("resultCode"), flush=True)
                 return None
@@ -105,9 +107,7 @@ def main():
             stops[str(s["stationId"])] = s
         print(p.pid, "주변 정류장", len(lst), flush=True)
 
-    routes = {
-        str(rid): route for rid, route in previous.get("routes", {}).items()
-    }
+    routes = {}
     for sid in list(stops):
         body = call("busstationservice/v2/getBusStationViaRouteListv2", stationId=sid)
         if body is None:
@@ -129,6 +129,15 @@ def main():
         seq = as_list((station_body or {}).get("busRouteStationList"))
         if not seq:
             continue
+        line_body = call("busrouteservice/v2/getBusRouteLineListv2", routeId=rid)
+        line = as_list((line_body or {}).get("busRouteLineList"))
+        try:
+            shape = [[float(p["y"]), float(p["x"])] for p in sorted(line, key=lambda p: int(p["lineSeq"]))]
+            if len(shape) >= 2 and all(33 < p[0] < 39 and 124 < p[1] < 132 for p in shape):
+                rt["shape"] = shape
+                rt["shape_source"] = "gbis_route_line"
+        except (ValueError, TypeError, KeyError):
+            FAILURES.append({"path": "route_geometry", "code": "invalid_coordinates"})
         rt["stations"] = [{"stationId": str(s["stationId"]), "seq": int(s["stationSeq"]),
                            "name": s.get("stationName"), "x": s.get("x"), "y": s.get("y"),
                            "turn": s.get("turnYn")} for s in seq]
@@ -144,7 +153,8 @@ def main():
         raise SystemExit("No bus stops collected; previous data preserved.")
     out["collection"] = {"updated_at": time.time(), "complete": not FAILURES,
                          "failed_calls": len(FAILURES),
-                         "routes_with_stations": sum(bool(r.get("stations")) for r in routes.values())}
+                         "routes_with_stations": sum(bool(r.get("stations")) for r in routes.values()),
+                         "routes_with_geometry": sum(bool(r.get("shape")) for r in routes.values())}
     temporary = RAW / "bus.json.tmp"
     temporary.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
     temporary.replace(RAW / "bus.json")
