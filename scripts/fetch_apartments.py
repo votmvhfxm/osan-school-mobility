@@ -158,7 +158,11 @@ def main():
         cache = {}
     # A completed earlier run starts a new refresh; an interrupted one resumes.
     if cache.get("complete"):
-        cache = {}
+        # Code pushes/retries on the same day must not spend the quota again.
+        if time.time() - cache.get("started_at", 0) >= 6 * 3600:
+            cache = {}
+        else:
+            cache["complete"] = False
     if time.time() - cache.get("started_at", time.time()) > 7 * 86400:
         cache = {}
     cache.setdefault("started_at", time.time())

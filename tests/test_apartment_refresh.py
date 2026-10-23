@@ -1,6 +1,9 @@
 import importlib.util
 from http.client import RemoteDisconnected
 import io
+import json
+import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -21,3 +24,23 @@ class ApartmentRefreshTests(unittest.TestCase):
         self.assertIsNone(m.reusable_coordinates(previous,"경기 오산시 다른도로 20"))
         self.assertIsNone(m.reusable_coordinates({**previous,"coord_source":"estimated"},previous["address"]))
 
+
+
+    def test_recent_completed_run_reuses_details_but_expires(self):
+        with tempfile.TemporaryDirectory() as folder:
+            data=Path(folder)
+            raw=data/"raw"
+            raw.mkdir()
+            checkpoint=raw/"apartments_checkpoint.json"
+            detail={"doroJuso":"road", "kaptName":"Apartment"}
+            checkpoint.write_text(json.dumps({"complete":True,"started_at":time.time(),
+                "details":{"a":detail},"coords":{"a":[37.15,127.05]}}))
+            with patch.object(m,"DATA",data),patch.object(m,"RAW",raw),patch.object(m,"load_env",return_value={"DATA_GO_KR_KEY":"k","VWORLD_API_KEY":"v"}),patch.object(m,"fetch_list",return_value=[{"kaptCode":"a"}]):
+                with patch.object(m,"request_json",side_effect=AssertionError("recent details should be reused")):
+                    m.main()
+                cached=json.loads(checkpoint.read_text())
+                cached["started_at"]=time.time()-7*3600
+                checkpoint.write_text(json.dumps(cached))
+                with patch.object(m,"request_json",return_value={"response":{"body":{"item":detail}}}) as request:
+                    m.main()
+                    self.assertEqual(request.call_count,1)
