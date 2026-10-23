@@ -6,7 +6,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
+from http.client import HTTPException
 from urllib.error import HTTPError, URLError
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -42,7 +43,8 @@ def request_json(url, params, tries=5):
     for attempt in range(tries):
         try:
             time.sleep(0.4)
-            with urlopen(url + "?" + urlencode(params), timeout=30) as response:
+            request = Request(url + "?" + urlencode(params), headers={"User-Agent": "OsanSchoolMobility/1.0"})
+            with urlopen(request, timeout=30) as response:
                 body = json.load(response)
             header = body.get("response", {}).get("header", {})
             code = str(header.get("resultCode", "00"))
@@ -58,7 +60,7 @@ def request_json(url, params, tries=5):
             retry_after = exc.headers.get("Retry-After", "")
             if retry_after.isdigit():
                 delay = min(120, max(delay, int(retry_after)))
-        except (URLError, TimeoutError, ValueError):
+        except (URLError, TimeoutError, ValueError, HTTPException, OSError):
             delay = min(60, 2 ** (attempt + 1))
         if attempt + 1 < tries:
             time.sleep(delay)
@@ -118,6 +120,28 @@ def geocode(address, key, address_type):
     return None
 
 
+def read_previous_complexes():
+    try:
+        with (DATA / "complexes.csv").open(encoding="utf-8-sig", newline="") as stream:
+            return {row["complex_id"]: row for row in csv.DictReader(stream)}
+    except (OSError, ValueError, KeyError, csv.Error):
+        return {}
+
+
+def reusable_coordinates(previous, address):
+    """Only reuse verified coordinates when the published address is unchanged."""
+    if not previous or previous.get("coord_source") != "vworld":
+        return None
+    normalize = lambda text: "".join(str(text or "").split())
+    if not normalize(address) or normalize(previous.get("address")) != normalize(address):
+        return None
+    try:
+        lat, lon = float(previous["lat"]), float(previous["lon"])
+        return (lat, lon) if 37.05 < lat < 37.25 and 126.90 < lon < 127.20 else None
+    except (ValueError, TypeError, KeyError):
+        return None
+
+
 def main():
     env = load_env()
     key, vkey = env.get("DATA_GO_KR_KEY"), env.get("VWORLD_API_KEY")
@@ -135,6 +159,10 @@ def main():
     # A completed earlier run starts a new refresh; an interrupted one resumes.
     if cache.get("complete"):
         cache = {}
+    if time.time() - cache.get("started_at", time.time()) > 7 * 86400:
+        cache = {}
+    cache.setdefault("started_at", time.time())
+    previous_complexes = read_previous_complexes()
     details = cache.setdefault("details", {})
     coords = cache.setdefault("coords", {})
     rows, pending = [], []
@@ -150,6 +178,11 @@ def main():
                 atomic_json(checkpoint, cache)
             detail = details[code]
             address = detail.get("doroJuso") or detail.get("kaptAddr") or ""
+            if code not in coords:
+                verified = reusable_coordinates(previous_complexes.get(code), address)
+                if verified:
+                    coords[code] = verified
+                    atomic_json(checkpoint, cache)
             if code not in coords:
                 for field, kind in (("doroJuso", "road"), ("kaptAddr", "parcel")):
                     if detail.get(field):

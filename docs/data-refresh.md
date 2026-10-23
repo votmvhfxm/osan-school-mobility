@@ -38,3 +38,6 @@ python scripts/validate_data.py
 로컬 Windows 수치연산 패키지에 따라 OPENBLAS_NUM_THREADS=1 및 OMP_NUM_THREADS=1 설정이 필요할 수 있습니다.
 자동 게시 직전 scripts/check_publish.py가 파일 허용 목록과 환경변수 비밀값을 검사합니다.
 
+
+첫 GitHub 실행에서 브이월드 RemoteDisconnected를 확인하여 재시도 대상으로 추가했습니다.
+공개된 기존 단지와 주소가 같은 경우 검증된 브이월드 좌표를 재사용하며, 신규·주소 변경만 다시 좌표 조회합니다.
