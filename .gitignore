@@ -4,3 +4,6 @@ backups/
 __pycache__/
 *.pyc
 cache/
+
+data/raw/apartments_checkpoint.json
+*.tmp

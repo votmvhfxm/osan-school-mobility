@@ -1,0 +1,60 @@
+name: Refresh apartment and commute data
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 19 * * 0'
+permissions:
+  contents: read
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+      VWORLD_API_KEY: ${{ secrets.VWORLD_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check credentials
+        run: |
+          test -n "$DATA_GO_KR_KEY" || { echo "Missing DATA_GO_KR_KEY secret"; exit 1; }
+          test -n "$VWORLD_API_KEY" || { echo "Missing VWORLD_API_KEY secret"; exit 1; }
+      - name: Install dependencies
+        run: pip install pandas geopandas osmnx scikit-learn requests
+      - uses: actions/cache/restore@v4
+        with:
+          path: data/raw/apartments_checkpoint.json
+          key: apartments-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: apartments-
+      - name: Collect all apartments
+        run: python scripts/fetch_apartments.py
+      - name: Rebuild commute outputs
+        run: python scripts/build_index.py
+      - name: Save checkpoint
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/raw/apartments_checkpoint.json
+          key: apartments-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Save report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apartment-collection-report
+          path: data/apartments_fetch_status.json
+          if-no-files-found: ignore
+      - name: Export refreshed data
+        uses: actions/upload-artifact@v4
+        with:
+          name: refreshed-data
+          path: |
+            data/complexes.csv
+            data/index*.json
+            data/priority*.csv
+            data/raw/apartments_osan*.json
+
