@@ -22,26 +22,25 @@ def get(url, params, tries=3):
             r = requests.get(url, params={"serviceKey": KEY, **params}, timeout=30)
             if r.status_code == 200:
                 return r
-            print("  HTTP", r.status_code, r.text[:200])
+            print("  HTTP", r.status_code)
         except requests.RequestException as e:
-            print("  err", e)
+            print("  err", type(e).__name__)
         time.sleep(1 + i)
     return None
 
 
 def standard_paged(api, out, keep):
     """표준데이터 API 전 페이지를 받아 keep(row) 인 행만 저장."""
-    url = f"http://api.data.go.kr/openapi/{api}"
+    url = f"https://api.data.go.kr/openapi/{api}"
     rows, page = [], 1
     while True:
         r = get(url, {"pageNo": page, "numOfRows": 1000, "type": "json"})
         if r is None:
-            break
+            raise RuntimeError("Public API page failed; existing data preserved.")
         try:
             body = r.json()["response"]["body"]
         except Exception:  # noqa: BLE001
-            print("  응답 해석 실패:", r.text[:300])
-            break
+            raise RuntimeError("Invalid public API response; existing data preserved.") from None
         items = body.get("items") or []
         if not items:
             break
@@ -95,7 +94,7 @@ def accidents(years=range(2019, 2025)):
                 try:
                     j = r.json()
                 except ValueError:
-                    print(f"  {path} {y}: JSON 아님 {r.text[:120]}")
+                    print(f"  {path} {y}: invalid JSON response")
                     continue
                 items = (j.get("items") or {}).get("item") or []
                 ok = ok or "resultCode" in j

@@ -5,6 +5,7 @@
 import json
 import math
 from datetime import datetime
+from functools import lru_cache
 
 import networkx as nx
 import numpy as np
@@ -13,6 +14,7 @@ import pandas as pd
 import geopandas as gpd
 
 from common import DATA, RAW
+from build_lite import write_indexes
 
 # ---- 지수 가중치 (README 참고) ----
 W_TIME, W_RISK, W_WAIT = 0.4, 0.4, 0.2
@@ -48,12 +50,20 @@ class Net:
                     d[name] = feature.get(name)
         self.G = nx.MultiDiGraph(G)
         self.Gu = ox.convert.to_undirected(G)  # 보행은 일방통행 무시
+        self.node_ids = np.array(list(self.Gu.nodes))
+        self.node_lat = np.radians([self.Gu.nodes[n]["y"] for n in self.node_ids])
+        self.node_lon = np.radians([self.Gu.nodes[n]["x"] for n in self.node_ids])
         for u, v, k, d in self.Gu.edges(keys=True, data=True):
             r = d.get("risk", 0)
             d["safe_cost"] = d["length"] * (1 + SAFE_ALPHA * r + SAFE_BETA * (r >= RISK_THRESHOLD))
 
+    @lru_cache(maxsize=4096)
     def nearest(self, lat, lon):
-        return ox.distance.nearest_nodes(self.Gu, lon, lat)
+        # Reuse node arrays and exact spherical distance; no repeated BallTree construction.
+        la, lo = np.radians([lat, lon])
+        distance = np.sin((self.node_lat - la) / 2) ** 2 + np.cos(la) * np.cos(
+            self.node_lat) * np.sin((self.node_lon - lo) / 2) ** 2
+        return int(self.node_ids[np.argmin(distance)])
 
     def route(self, a, b, weight="safe_cost"):
         """a, b = (lat, lon). weight="length" 최단 경로, "safe_cost" 위험 회피 경로."""
@@ -183,7 +193,7 @@ def bus_option(net, bus, cid, sid, c_ll, s_ll, walk_cache):
             continue
         if alloc <= 0:
             continue
-        st = {s["seq"]: s for s in rt["stations"]}
+        st = {s["seq"]: s for s in rt.get("stations", [])}
         for a in bus["near"].get(cid, []):
             for b in bus["near"].get(sid, []):
                 for qa in rt["pos"].get(a, []):
@@ -224,7 +234,7 @@ def bus_option(net, bus, cid, sid, c_ll, s_ll, walk_cache):
         ride = road_m / (BUS_KMH * 1000 / 60)
         best = {
             "_est": access_m / WALK_M_PER_MIN * 1.3 + wait + ride + egress_m / WALK_M_PER_MIN * 1.3,
-            "route_id": None, "route_name": "개발계정 트래픽 제한 · 도로망 기반 추정", "alloc_min": None,
+            "route_id": None, "route_name": "정류장·도로망 기반 추정", "alloc_min": None,
             "wait_min": wait, "ride_min": round(ride, 1), "n_stops": None,
             "board": {"name": origin.get("stationName"), "ll": r6((float(origin["y"]), float(origin["x"])))},
             "alight": {"name": destination.get("stationName"), "ll": r6((float(destination["y"]), float(destination["x"])))},
@@ -285,7 +295,7 @@ def main():
             return None
         sf = walk_cache(c_ll, s_ll)                    # 위험 회피 경로
         # 우회가 과하거나 위험이 줄지 않으면 최단 경로를 그대로 추천
-        safe_ok = sf["dist_m"] <= sp["dist_m"] * SAFE_MAX_DETOUR and sf["risk_len_m"] < sp["risk_len_m"]
+        safe_ok = sf is not None and sf["dist_m"] <= sp["dist_m"] * SAFE_MAX_DETOUR and sf["risk_len_m"] < sp["risk_len_m"]
         w = dict(sf if safe_ok else sp)
         w.update({"time_min": w["walk_min"], "wait_transfer_min": 0.0, "is_safe_detour": bool(safe_ok)})
         w["shortest"] = {k: sp[k] for k in ("dist_m", "walk_min", "risk_sum", "n_risk_segments", "risk_len_m",
@@ -370,6 +380,7 @@ def main():
         "bus_available": bus_has_routes,
         "bus_estimate_available": bool(bus and bus.get("stops")),
         "bus_stop_count": load_bus_stop_count(),
+        "bus_collection": bus.get("collection") if bus else None,
         "bus_recommendations": bus_recommendations,
         "school_recommendations": school_recommendations,
         "risk_model": json.loads((DATA.parent / "model" / "metrics.json").read_text(encoding="utf-8")).get("mode"),
@@ -380,9 +391,8 @@ def main():
     # floating columns as NaN, which is not valid JSON for browser fetch().
     schools = sc.astype(object).where(pd.notna(sc), None).to_dict("records")
     future_schools = fut.astype(object).where(pd.notna(fut), None).to_dict("records")
-    (DATA / "index.json").write_text(json.dumps({"meta": meta, "schools": schools, "future_schools": future_schools,
-                                                 "complexes": out_cx},
-                                                ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    write_indexes(DATA, {"meta": meta, "schools": schools,
+                         "future_schools": future_schools, "complexes": out_cx})
 
     # ---- 우선순위 표 ----
     rows = []

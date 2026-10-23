@@ -68,7 +68,7 @@ function render(){
       html+='<p class="small">통과 경로 수는 학생 수가 아닙니다. 표시 지점은 구간의 대표 위치입니다.</p>';
     }else if(state.category==="bus"){
       const items=data.meta.bus_recommendations||[];
-      html+=`<div class="notice">노선·배차 데이터는 개발계정 트래픽 제한으로 확보하지 못해, 정류장 위치와 도로망 거리를 바탕으로 계산한 <strong>배치 검토용 추정</strong>입니다. 실제 노선 신설·이전 결정 전 현장 확인이 필요합니다.</div>`;
+      html+=`<div class="notice">${data.meta.bus_available?"수집한 노선·배차 정보를 함께 반영했습니다.":"노선·배차 상세 정보가 없어 정류장 위치와 도로망 거리로 추정했습니다."} <strong>배치 검토용 분석</strong>이며 실제 운행시간과 다를 수 있습니다.</div>`;
       html+=items.length?items.map((x,i)=>`<button class="candidate ${i===state.segment?"selected":""}" data-segment="${i}" aria-pressed="${i===state.segment}"><div class="row"><strong>${i+1}. ${esc(x.stop)}</strong></div><div class="small">${esc(busRecommendationReason(x))}</div><div class="small">${esc(x.complex)} 단지 통학 개선 검토</div></button>`).join(""):'<div class="empty"><h3>정류장 좌표가 없습니다</h3><p>정류장 데이터를 먼저 수집해야 합니다.</p></div>';
     }else{
       const items=data.meta.school_recommendations||[];
@@ -77,13 +77,13 @@ function render(){
     }
   }else{
     html=`<h2 class="panel-title">우리 단지에서 학교까지</h2><p class="panel-lead">출발 단지를 바꾸면 학교별 통학 부담과 안전 경로가 즉시 업데이트됩니다.</p>${selectors()}${tabs([["all","전체 학교"],["초등학교","초등학교"],["중학교","중학교"]],state.schoolLevel,"data-level")}${tabs([["walk","도보"],["bus","버스"]],state.mode,"data-mode")}`;
-    if(state.mode==="bus"&&!data.meta.bus_available)html+=`<div class="notice">${data.meta.bus_estimate_available?`노선·배차 데이터는 개발계정 트래픽 제한으로 확보하지 못해, 최근접 정류장과 도로망 거리로 계산한 추정값입니다. 실제 버스 시간표가 아닙니다.`:"버스 정류장 데이터 수집 전입니다."}</div>`;
+    if(state.mode==="bus"&&!data.meta.bus_available)html+=`<div class="notice">${data.meta.bus_estimate_available?`노선·배차 상세 데이터가 없어, 최근접 정류장과 도로망 거리로 계산한 추정값입니다. 실제 버스 시간표가 아닙니다.`:"버스 정류장 데이터 수집 전입니다."}</div>`;
     const rankedSchools=visibleSchools().map(s=>({school:s,walk:currentComplex()?.results[s.school_id]?.[state.mode]})).sort((a,b)=>{
       const at=Number(a.walk?.time_min),bt=Number(b.walk?.time_min);
       if(Number.isFinite(at)&&Number.isFinite(bt))return at-bt;
       return Number.isFinite(at)?-1:Number.isFinite(bt)?1:sortKorean(a.school.name,b.school.name);
     });
-    html+=state.complex?rankedSchools.map(({school:s,walk:w})=>w?`<button class="school-card ${state.school===s.school_id?"selected":""}" data-school="${esc(s.school_id)}" aria-pressed="${state.school===s.school_id}"><div class="row"><strong>${esc(s.name)}</strong><span class="school-level">${esc(s.school_level||"학교")}</span><span class="score">${fmt(w.time_min)}<small>분</small></span></div><div class="tags"><span>부담 지수 ${fmt(w.index)}</span><span>위험 구간 ${esc(w.risk_len_m)}m</span></div>${state.mode==="bus"?`<div class="small">${esc(w.route_name)}번 · 대기 ${fmt(w.wait_min)}분 · 승차 ${fmt(w.ride_min)}분</div>`:""}</button>`:`<div class="notice">${esc(s.name)} · ${data.meta.bus_available?"계산된 버스 경로 없음":"버스 데이터 미수집"}</div>`).join(""):'<div class="notice">출발 단지를 선택하면 학교별 통학 결과를 확인할 수 있습니다.</div>';
+    html+=state.complex?rankedSchools.map(({school:s,walk:w})=>w?`<button class="school-card ${state.school===s.school_id?"selected":""}" data-school="${esc(s.school_id)}" aria-pressed="${state.school===s.school_id}"><div class="row"><strong>${esc(s.name)}</strong><span class="school-level">${esc(s.school_level||"학교")}</span><span class="score">${fmt(w.time_min)}<small>분</small></span></div><div class="tags"><span>부담 지수 ${fmt(w.index)}</span><span>위험 구간 ${esc(w.risk_len_m)}m</span></div>${state.mode==="bus"?`<div class="small">${w.estimated?"정류장 기반 추정":esc(w.route_name)+"번"} · 대기 ${fmt(w.wait_min)}분 · 승차 ${fmt(w.ride_min)}분</div>`:""}</button>`:`<div class="notice">${esc(s.name)} · ${data.meta.bus_available?"계산된 버스 경로 없음":"버스 데이터 미수집"}</div>`).join(""):'<div class="notice">출발 단지를 선택하면 학교별 통학 결과를 확인할 수 있습니다.</div>';
     html+='<p class="small">단지 중심점 기준 추정입니다. 실제 출입구와 보행 환경에 따라 시간이 달라질 수 있습니다.</p>';
   }
   $("panel").innerHTML=html;bindPanel();drawMap();
@@ -193,15 +193,16 @@ async function initMap(){
 }
 (async()=>{
   try{
-    const r=await fetch("../data/index-lite.json?v=20261016-1");if(!r.ok)throw new Error("통학 데이터 응답 오류");data=await r.json();if(!data.complexes?.length||!data.schools?.length)throw new Error("통학 데이터가 비어 있습니다");
-    try{const sr=await fetch("../data/priority_segments.csv?v=20261016",{cache:"no-store"});if(!sr.ok)throw new Error();segments=csv(await sr.text());}catch{segmentError=true;}
+    const r=await fetch("../data/index-lite.json", {cache:"no-cache"});if(!r.ok)throw new Error("통학 데이터 응답 오류");data=await r.json();if(!data.complexes?.length||!data.schools?.length)throw new Error("통학 데이터가 비어 있습니다");
+    try{const sr=await fetch("../data/priority_segments.csv",{cache:"no-store"});if(!sr.ok)throw new Error();segments=csv(await sr.text());}catch{segmentError=true;}
     state.complex=null;state.school=null;
     $("coverage").textContent=`${data.complexes.length}개 단지 · ${data.schools.length}개 학교`;
     $("riskCount").textContent=`${segments.length || "—"}개`;
     $("schoolCount").textContent=`${data.schools.length}곳`;
     $("dataStatus").textContent=`${data.meta.risk_model==="rule"?"규칙 기반 위험도":"계산된 위험도"} · ${data.meta.bus_available?"버스 경로 연결":data.meta.bus_stop_count?`정류장 ${data.meta.bus_stop_count}곳 수집`:"버스 데이터 수집 전"}`;
     if(window.SURVEY_ENABLED===true&&surveyUrl()){$("surveyButton").setAttribute("aria-label","현장 의견조사 · 구글폼 새 창");$("surveyButton").title="현장 의견조사 · 구글폼 새 창";$("surveyButton").querySelector(".pending-dot").hidden=true;}
-    navigate(location.hash.slice(1)||"commute");await initMap();
-    fullDataPromise=fetch("../data/index.json?v=20261016-1").then(response=>{if(!response.ok)throw new Error("상세 통학 데이터 응답 오류");return response.json();}).then(full=>{data=full;if(state.page==="commute")render();return full;}).catch(error=>{console.warn("상세 통학 경로 지연 로드 실패",error);return null;});
+    navigate(location.hash.slice(1)||"commute");
+    fullDataPromise=fetch("../data/index.json", {cache:"no-cache"}).then(response=>{if(!response.ok)throw new Error("상세 통학 데이터 응답 오류");return response.json();}).then(full=>{if(full.meta.generated!==data.meta.generated)throw new Error("데이터 갱신 중입니다. 새로고침해 주세요.");data=full;if(state.page==="commute")render();return full;}).catch(error=>{console.warn("상세 통학 경로 지연 로드 실패",error);$("mapStatus").textContent="상세 경로를 불러오지 못했습니다. 새로고침해 주세요.";return null;});
+    await initMap();
   }catch(e){$("panel").innerHTML=`<h2>데이터를 불러오지 못했어요</h2><p>${esc(e.message)}</p><p class="small">서버 실행 상태와 data/index.json을 확인한 뒤 새로고침해 주세요.</p>`;$("mapStatus").textContent="통학 데이터 연결 필요";$("dataStatus").textContent="데이터 연결 오류";}
 })();

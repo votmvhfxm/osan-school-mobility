@@ -1,0 +1,14 @@
+# Only explicitly public assets are uploaded
+**
+!vercel.json
+!web/
+!web/index.html
+!web/app.js
+!web/app.css
+!web/config.js
+!data/
+!data/index.json
+!data/index-lite.json
+!data/priority.csv
+!data/priority_segments.csv
+!data/priority_bus.csv

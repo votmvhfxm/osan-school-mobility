@@ -17,6 +17,8 @@ BASE = "https://apis.data.go.kr/6410000"
 TARGET_CITY = "오산"
 CACHE_FILE = RAW / "bus_api_cache.json"
 REQUEST_GAP = 0.35
+CACHE_TTL_SECONDS = 24 * 60 * 60
+FAILURES = []
 
 
 def load_cache():
@@ -35,14 +37,16 @@ API_CACHE = load_cache()
 
 
 def save_cache():
-    CACHE_FILE.write_text(json.dumps(API_CACHE, ensure_ascii=False, indent=1), encoding="utf-8")
+    temporary = CACHE_FILE.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(API_CACHE, ensure_ascii=False, indent=1), encoding="utf-8")
+    temporary.replace(CACHE_FILE)
 
 
 def call(path, **params):
     key = cache_key(path, params)
     cached = API_CACHE.get(key)
-    if cached is not None:
-        return cached
+    if isinstance(cached, dict) and "fetched_at" in cached and time.time() - cached["fetched_at"] < CACHE_TTL_SECONDS:
+        return cached["body"]
     for i in range(4):
         try:
             r = requests.get(f"{BASE}/{path}", params={"serviceKey": KEY, "format": "json", **params}, timeout=12)
@@ -51,20 +55,23 @@ def call(path, **params):
                 print(f"  rate limited {path}; retrying in {delay}s", flush=True)
                 time.sleep(delay)
                 continue
+            r.raise_for_status()
             response = r.json().get("response", {})
             if "msgHeader" in response and response["msgHeader"].get("resultCode") not in (0, "0", None):
-                print("  API unavailable", path, response["msgHeader"].get("resultMessage"), flush=True)
+                FAILURES.append({"path": path, "code": response["msgHeader"].get("resultCode")})
+                print("  API unavailable", path, "code", response["msgHeader"].get("resultCode"), flush=True)
                 return None
             body = response.get("msgBody") or {}
             if body:
-                API_CACHE[key] = body
+                API_CACHE[key] = {"fetched_at": time.time(), "body": body}
                 save_cache()
-            time.sleep(0.25)
+            time.sleep(REQUEST_GAP)
             return body
         except Exception as e:  # noqa: BLE001
-            print("  err", path, params, e)
+            print("  err", path, type(e).__name__)
             sys.stdout.flush()
             time.sleep(1 + i)
+    FAILURES.append({"path": path, "code": "request_failed"})
     return None
 
 
@@ -133,7 +140,14 @@ def main():
         routes = previous["routes"]
         print("노선 상세 응답이 없어 기존 정상 노선 데이터를 보존합니다.", flush=True)
     out = {"near": {k: [str(v) for v in vs] for k, vs in near.items()}, "stops": stops, "routes": routes}
-    (RAW / "bus.json").write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
+    if not stops:
+        raise SystemExit("No bus stops collected; previous data preserved.")
+    out["collection"] = {"updated_at": time.time(), "complete": not FAILURES,
+                         "failed_calls": len(FAILURES),
+                         "routes_with_stations": sum(bool(r.get("stations")) for r in routes.values())}
+    temporary = RAW / "bus.json.tmp"
+    temporary.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
+    temporary.replace(RAW / "bus.json")
     print("-> data/raw/bus.json", len(stops), "정류장", len(routes), "노선", flush=True)
 
 

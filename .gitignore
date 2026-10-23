@@ -1,9 +1,19 @@
+# Local credentials and tooling
 .env
+.env.*
+!.env.example
+.vercel/
+.runtime/
+.venv/
+venv/
 web/config.js
 backups/
 __pycache__/
 *.pyc
 cache/
-
 data/raw/apartments_checkpoint.json
 *.tmp
+*.log
+*.pem
+*.key
+data/raw/bus_api_cache.json

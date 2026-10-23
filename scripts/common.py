@@ -17,14 +17,11 @@ CRS_LL = "EPSG:4326"
 
 
 def load_env():
-    env = {}
-    f = ROOT / ".env"
-    if f.exists():
-        for line in f.read_text(encoding="utf-8").splitlines():
-            line = line.split("#", 1)[0].strip()
-            if "=" in line:
-                k, v = line.split("=", 1)
-                env[k.strip()] = v.strip()
-    for k in ("NAVER_MAP_CLIENT_ID", "NAVER_MAP_CLIENT_SECRET", "DATA_GO_KR_KEY", "KOROAD_API_KEY", "TMAP_APP_KEY", "ODSAY_API_KEY"):
-        env.setdefault(k, os.environ.get(k, ""))
+    """Use the same BOM/quote-safe loader as the apartment collector."""
+    from fetch_apartments import load_env as read_env
+    env = read_env()
+    for key in ("NAVER_MAP_CLIENT_ID", "NAVER_MAP_CLIENT_SECRET", "DATA_GO_KR_KEY",
+                "KOROAD_API_KEY", "SCHOOLINFO_API_KEY", "VWORLD_API_KEY",
+                "TMAP_APP_KEY", "ODSAY_API_KEY"):
+        env.setdefault(key, "")
     return env

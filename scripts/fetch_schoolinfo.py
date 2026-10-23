@@ -5,8 +5,6 @@
 """
 import csv
 import json
-import os
-import ssl
 from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import urlopen
@@ -14,23 +12,20 @@ from urllib.request import urlopen
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
 RAW = DATA / "raw"
-KEY = os.getenv("SCHOOLINFO_API_KEY", "")
-if not KEY and (ROOT / ".env").exists():
-    for line in (ROOT / ".env").read_text(encoding="utf-8").splitlines():
-        if line.startswith("SCHOOLINFO_API_KEY="):
-            KEY = line.split("=", 1)[1].strip()
+from common import load_env
+KEY = load_env()["SCHOOLINFO_API_KEY"]
 
-API = "http://www.schoolinfo.go.kr/openApi.do"
+API = "https://www.schoolinfo.go.kr/openApi.do"
 LEVELS = {"02": "초등학교", "03": "중학교"}
 FIELDS = ["school_id", "name", "school_level", "address", "lat", "lon", "classes", "students", "opened", "coord_source", "stats_source"]
 
 
 def fetch(level):
     query = urlencode({"apiKey": KEY, "apiType": "0", "sidoCode": "41", "sggCode": "41370", "schulKndCode": level})
-    with urlopen(f"{API}?{query}", timeout=30, context=ssl._create_unverified_context()) as response:
+    with urlopen(f"{API}?{query}", timeout=30) as response:
         body = json.loads(response.read().decode("utf-8"))
     if body.get("resultCode") != "success":
-        raise RuntimeError(f"학교알리미 {LEVELS[level]} 응답 오류: {body.get('resultMsg', 'unknown')}")
+        raise RuntimeError(f"학교알리미 {LEVELS[level]} 응답 오류: {body.get('resultCode', 'unknown')}")
     return body.get("list", [])
 
 
